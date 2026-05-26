@@ -4,18 +4,23 @@ import type { MockScenarioId } from "@/core/types";
 type ScenarioSwitcherProps = {
   value: MockScenarioId;
   onChange: (scenario: MockScenarioId) => void;
+  compact?: boolean;
 };
 
-export function ScenarioSwitcher({ value, onChange }: ScenarioSwitcherProps) {
+export function ScenarioSwitcher({
+  value,
+  onChange,
+  compact = false
+}: ScenarioSwitcherProps) {
   const selected = MOCK_SCENARIOS.find((scenario) => scenario.id === value);
 
   return (
-    <label className="grid gap-1 text-xs text-slate-400">
-      Demo scenario
+    <label className="grid gap-1 text-[11px] text-slate-500">
+      {compact ? "Scenario" : "Demo scenario"}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as MockScenarioId)}
-        className="min-w-56 rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2.5 text-sm font-medium text-slate-100 outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
+        className="min-w-44 rounded-[10px] border border-[color:var(--aegis-line-soft)] bg-[rgba(118,146,188,0.04)] px-3 py-2 text-[13px] font-medium text-slate-100 outline-none transition focus:border-[#4b8dff]/60 focus:ring-2 focus:ring-[#4b8dff]/15"
       >
         {MOCK_SCENARIOS.map((scenario) => (
           <option key={scenario.id} value={scenario.id}>
@@ -23,7 +28,9 @@ export function ScenarioSwitcher({ value, onChange }: ScenarioSwitcherProps) {
           </option>
         ))}
       </select>
-      {selected ? <span className="text-[11px] text-slate-500">{selected.description}</span> : null}
+      {!compact && selected ? (
+        <span className="text-[11px] text-slate-500">{selected.description}</span>
+      ) : null}
     </label>
   );
 }

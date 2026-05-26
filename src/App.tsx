@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, startTransition } from "react";
 import { AnimatePresence } from "framer-motion";
 import { AppShell } from "@/components/layout/AppShell";
+import { FindingsPanel } from "@/components/dashboard/FindingsPanel";
 import { StatusOverview } from "@/components/dashboard/StatusOverview";
 import { DiagnosticTimeline } from "@/components/timeline/DiagnosticTimeline";
-import { DetailsPanel } from "@/components/details/DetailsPanel";
 import { ConfirmFixModal } from "@/components/fixes/ConfirmFixModal";
+import { RepairPlanPanel } from "@/components/fixes/RepairPlanPanel";
 import { ReportPreview } from "@/components/reports/ReportPreview";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
-import { RecentScans } from "@/components/dashboard/RecentScans";
 import { createMockScanResult, getDefaultMockScenario } from "@/core/mockData";
 import type {
   AppMode,
@@ -38,7 +38,6 @@ export default function App() {
   const [pendingFix, setPendingFix] = useState<FixAction | null>(null);
   const [fixBusy, setFixBusy] = useState(false);
   const [fixResult, setFixResult] = useState<FixExecutionResult | null>(null);
-  const [recentScans, setRecentScans] = useState<ScanResult[]>([initialScan]);
 
   const adapter = useMemo(() => (demoMode ? mockAdapter : tauriAdapter), [demoMode]);
 
@@ -47,7 +46,6 @@ export default function App() {
       adapter,
       initialScan,
       onScanComplete: (scan) => {
-        setRecentScans((current) => [scan, ...current].slice(0, 3));
         setSelectedNodeId(scan.diagnosis.primaryFailedNodeId ?? scan.nodes[0]?.id);
       }
     });
@@ -66,6 +64,7 @@ export default function App() {
 
   const selectedNode =
     displayNodes.find((node) => node.id === selectedNodeId) ?? displayNodes[0];
+  const totalChecks = scanResult.nodes.reduce((count, node) => count + node.checks.length, 0);
 
   const handleScenarioChange = (nextScenario: MockScenarioId) => {
     startTransition(() => {
@@ -104,6 +103,7 @@ export default function App() {
 
   return (
     <AppShell
+      scan={scanResult}
       mode={mode}
       theme={theme}
       scenarioId={scenarioId}
@@ -116,73 +116,43 @@ export default function App() {
       onExportReport={() => setReportOpen(true)}
       onOpenSettings={() => setSettingsOpen(true)}
     >
-      <div className="grid gap-5">
+      <div className="grid min-w-0 gap-4">
         <StatusOverview
           diagnosis={scanResult.diagnosis}
+          completedChecks={totalChecks}
+          lastRunAt={scanResult.createdAt}
           isScanning={isScanning}
           onRunScan={handleRunScan}
-          onApplyRecommendedFix={handleOpenRecommendedFix}
           onViewReport={() => setReportOpen(true)}
         />
 
         <DiagnosticTimeline
           nodes={displayNodes}
           selectedNodeId={selectedNode?.id}
+          activeNodeId={activeNodeId}
           onSelectNode={setSelectedNodeId}
           isScanning={isScanning}
         />
 
-        <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
-          {selectedNode ? (
-            <DetailsPanel node={selectedNode} mode={mode} onRunFix={setPendingFix} />
-          ) : null}
+        <div className="grid min-w-0 gap-4 2xl:grid-cols-2">
+          <FindingsPanel
+            scan={scanResult}
+            selectedNodeId={selectedNode?.id}
+            mode={mode}
+            onSelectNode={setSelectedNodeId}
+            onViewReport={() => setReportOpen(true)}
+            onOpenTechnician={() => setMode("technician")}
+          />
 
-          <aside className="grid gap-5 content-start">
-            <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-panel backdrop-blur-2xl">
-              <h2 className="text-lg font-semibold tracking-tight text-white">
-                Ranked safe actions
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Aegis ranks fixes by evidence and safety. Aggressive actions are advanced and never auto-run.
-              </p>
-              <div className="mt-4 space-y-3">
-                {scanResult.diagnosis.recommendedFixes.slice(0, 3).map((fix) => (
-                  <button
-                    key={fix.id}
-                    type="button"
-                    onClick={() => setPendingFix(fix)}
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-left transition hover:border-cyan-300/30 hover:bg-slate-900/60"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-white">{fix.title}</span>
-                      <span className="text-xs font-semibold capitalize text-cyan-100">
-                        {fix.safety}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm leading-5 text-slate-400">
-                      {fix.estimatedImpact}
-                    </p>
-                  </button>
-                ))}
-                {!scanResult.diagnosis.recommendedFixes.length ? (
-                  <p className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4 text-sm text-emerald-100">
-                    No repair action is needed for this scan.
-                  </p>
-                ) : null}
-              </div>
-            </section>
-
-            <RecentScans scans={recentScans} />
-
-            {fixResult ? (
-              <section className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-5 shadow-panel">
-                <h2 className="text-lg font-semibold text-white">{fixResult.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-cyan-50/85">
-                  {fixResult.message}
-                </p>
-              </section>
-            ) : null}
-          </aside>
+          <RepairPlanPanel
+            diagnosis={scanResult.diagnosis}
+            fixResult={fixResult}
+            isScanning={isScanning}
+            onOpenAdvancedOptions={() => setSettingsOpen(true)}
+            onRunFix={setPendingFix}
+            onRunScan={handleRunScan}
+            onViewReport={() => setReportOpen(true)}
+          />
         </div>
       </div>
 

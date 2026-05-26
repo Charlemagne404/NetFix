@@ -130,7 +130,7 @@ export function generateOverallDiagnosis(nodes: DiagnosticNode[]): OverallDiagno
       confidence: hasEvidence(ip, "169.254") ? 95 : 88,
       severity: "high",
       primaryFailedNodeId: "ip",
-      fixes: getFixActions(["renew-dhcp", "restart-adapter", "open-network-settings"])
+      fixes: getFixActions(["renew-dhcp", "restart-adapter", "tcpip-reset", "open-network-settings"])
     });
   }
 

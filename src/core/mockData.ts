@@ -344,9 +344,9 @@ function makeScan(id: MockScenarioId, patches: NodePatch[]): ScanResult {
     diagnosis,
     nodes,
     environment: {
-      os: "Mock Windows 11",
-      hostname: "AEGIS-DEMO",
-      appVersion: "0.1.0",
+      os: "Windows 11 Pro",
+      hostname: "DESKTOP-AEGIS",
+      appVersion: "1.3.0.2024",
       isAdmin: false
     }
   };
@@ -431,7 +431,12 @@ function scenarioPatches(id: MockScenarioId): NodePatch[] {
             "Signal/authentication completed but network admission failed",
             "Static IP or DHCP client state is stale"
           ],
-          recommendedFixes: getFixActions(["renew-dhcp", "restart-adapter", "open-network-settings"]),
+          recommendedFixes: getFixActions([
+            "renew-dhcp",
+            "restart-adapter",
+            "tcpip-reset",
+            "open-network-settings"
+          ]),
           rawOutput:
             "IPv4 Address: 169.254.77.18\nDefault Gateway: \nDHCP Enabled: Yes\nLease Obtained: N/A"
         },
@@ -704,10 +709,10 @@ function scenarioPatches(id: MockScenarioId): NodePatch[] {
   }
 }
 
-export function createMockScanResult(scenarioId: MockScenarioId = "dns-failure"): ScanResult {
+export function createMockScanResult(scenarioId: MockScenarioId = "dhcp-apipa"): ScanResult {
   return makeScan(scenarioId, scenarioPatches(scenarioId));
 }
 
 export function getDefaultMockScenario(): MockScenarioId {
-  return "dns-failure";
+  return "dhcp-apipa";
 }
