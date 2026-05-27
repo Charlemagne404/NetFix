@@ -12,6 +12,7 @@ import { createMockScanResult, getDefaultMockScenario } from "@/core/mockData";
 import type {
   AppMode,
   FixAction,
+  FixConfirmation,
   FixExecutionResult,
   MockScenarioId,
   ScanResult,
@@ -86,10 +87,10 @@ export default function App() {
     }
   };
 
-  const handleConfirmFix = async (fix: FixAction) => {
+  const handleConfirmFix = async (fix: FixAction, confirmation?: FixConfirmation) => {
     setFixBusy(true);
     try {
-      const result = await adapter.runFix(fix.id);
+      const result = await adapter.runFix(fix, confirmation);
       setFixResult(result);
       setPendingFix(null);
     } finally {
@@ -116,7 +117,7 @@ export default function App() {
       onExportReport={() => setReportOpen(true)}
       onOpenSettings={() => setSettingsOpen(true)}
     >
-      <div className="grid min-w-0 gap-4">
+      <div className="grid min-w-0 gap-3 lg:h-full lg:min-h-0 lg:grid-rows-[auto_auto_minmax(0,1fr)]">
         <StatusOverview
           diagnosis={scanResult.diagnosis}
           completedChecks={totalChecks}
@@ -134,7 +135,7 @@ export default function App() {
           isScanning={isScanning}
         />
 
-        <div className="grid min-w-0 gap-4 2xl:grid-cols-2">
+        <div className="grid min-w-0 gap-3 lg:min-h-0 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
           <FindingsPanel
             scan={scanResult}
             selectedNodeId={selectedNode?.id}

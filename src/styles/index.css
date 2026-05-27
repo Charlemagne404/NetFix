@@ -41,6 +41,7 @@
 }
 
 html {
+  min-height: 100%;
   min-width: 320px;
   background: #08111b;
 }
@@ -49,6 +50,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   background: #08111b;
   color: var(--aegis-text);
   font-family: inherit;
@@ -56,6 +58,7 @@ body {
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 button,

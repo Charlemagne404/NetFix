@@ -1,4 +1,8 @@
-import { getFixActions, rankFixes } from "./fixRegistry";
+import {
+  filterAutomaticRecommendations,
+  getFixActions,
+  rankFixes
+} from "./fixRegistry";
 import { TIMELINE_NODE_IDS } from "./timelineDefinition";
 import type {
   DiagnosticNode,
@@ -67,7 +71,7 @@ function buildDiagnosis(input: {
     confidence: input.confidence,
     severity: input.severity,
     primaryFailedNodeId: input.primaryFailedNodeId,
-    recommendedFixes: rankFixes(input.fixes)
+    recommendedFixes: rankFixes(filterAutomaticRecommendations(input.fixes))
   };
 }
 
@@ -130,7 +134,7 @@ export function generateOverallDiagnosis(nodes: DiagnosticNode[]): OverallDiagno
       confidence: hasEvidence(ip, "169.254") ? 95 : 88,
       severity: "high",
       primaryFailedNodeId: "ip",
-      fixes: getFixActions(["renew-dhcp", "restart-adapter", "tcpip-reset", "open-network-settings"])
+      fixes: getFixActions(["renew-dhcp", "restart-adapter", "open-network-settings"])
     });
   }
 

@@ -1,4 +1,6 @@
-import type { FixAction, FixSafety } from "./types";
+import type { FixAction, FixConfirmation, FixSafety } from "./types";
+
+export const AGGRESSIVE_CONFIRMATION_PHRASE = "RESET";
 
 export const FIX_ACTIONS: Record<string, FixAction> = {
   "flush-dns": {
@@ -157,10 +159,40 @@ export function getFixActions(ids: string[]): FixAction[] {
   return ids.map(getFixAction);
 }
 
+export function isAllowlistedFixId(id: string): boolean {
+  return Object.prototype.hasOwnProperty.call(FIX_ACTIONS, id);
+}
+
 export function safetySortValue(safety: FixSafety): number {
   if (safety === "safe") return 0;
   if (safety === "moderate") return 1;
   return 2;
+}
+
+export function requiresExplicitConfirmation(safety: FixSafety): boolean {
+  return safety !== "safe";
+}
+
+export function requiresTypedConfirmation(safety: FixSafety): boolean {
+  return safety === "aggressive";
+}
+
+export function buildFixConfirmation(
+  safety: FixSafety,
+  typedPhrase?: string
+): FixConfirmation | undefined {
+  if (!requiresExplicitConfirmation(safety)) {
+    return undefined;
+  }
+
+  return {
+    acknowledged: true,
+    typedPhrase: requiresTypedConfirmation(safety) ? typedPhrase : undefined
+  };
+}
+
+export function filterAutomaticRecommendations(fixes: FixAction[]): FixAction[] {
+  return fixes.filter((fix) => fix.safety !== "aggressive");
 }
 
 export function rankFixes(fixes: FixAction[]): FixAction[] {

@@ -46,6 +46,11 @@ export type FixAction = {
   warning?: string;
 };
 
+export type FixConfirmation = {
+  acknowledged: boolean;
+  typedPhrase?: string;
+};
+
 export type DiagnosticNode = {
   id: string;
   label: string;

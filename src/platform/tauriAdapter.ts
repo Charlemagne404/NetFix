@@ -1,8 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createMockScanResult } from "@/core/mockData";
+import { getFixAction, isAllowlistedFixId } from "@/core/fixRegistry";
 import { buildHtmlReport, buildJsonReport } from "@/core/reportExport";
 import type {
   EnvironmentInfo,
+  FixAction,
+  FixConfirmation,
   FixExecutionResult,
   MockScenarioId,
   ScanResult
@@ -17,6 +20,34 @@ declare global {
 
 export function hasTauriRuntime(): boolean {
   return typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__);
+}
+
+function browserEnvironmentInfo(): EnvironmentInfo {
+  return {
+    os: navigator.platform || "Unknown",
+    hostname: "Local browser",
+    appVersion: "0.1.0",
+    isAdmin: false,
+    isWindows: navigator.userAgent.toLowerCase().includes("windows"),
+    isTauri: hasTauriRuntime()
+  };
+}
+
+let environmentInfoPromise: Promise<EnvironmentInfo> | undefined;
+
+async function getResolvedEnvironmentInfo(): Promise<EnvironmentInfo> {
+  if (!hasTauriRuntime()) {
+    return browserEnvironmentInfo();
+  }
+
+  if (!environmentInfoPromise) {
+    environmentInfoPromise = invoke<EnvironmentInfo>("get_environment_info", {}).catch((error) => {
+      console.warn("Tauri command get_environment_info failed; using browser fallback", error);
+      return browserEnvironmentInfo();
+    });
+  }
+
+  return environmentInfoPromise;
 }
 
 async function invokeWithMockFallback<T>(
@@ -39,18 +70,44 @@ async function invokeWithMockFallback<T>(
 export const tauriAdapter: PlatformAdapter = {
   kind: "tauri",
   async runScan(scenarioId?: MockScenarioId) {
+    const environment = await getResolvedEnvironmentInfo();
+    if (!environment.isWindows) {
+      return createMockScanResult(scenarioId);
+    }
+
     return invokeWithMockFallback<ScanResult>(
       "run_scan",
       { scenarioId },
       () => createMockScanResult(scenarioId)
     );
   },
-  async runFix(fixId: string) {
+  async runFix(fix: FixAction, confirmation?: FixConfirmation) {
+    if (!isAllowlistedFixId(fix.id)) {
+      return {
+        fixId: fix.id,
+        status: "blocked",
+        title: "Unknown fix",
+        message: "The requested fix ID is not in the frontend allowlist."
+      };
+    }
+
+    const allowlistedFix = getFixAction(fix.id);
+    const environment = await getResolvedEnvironmentInfo();
+    if (!environment.isWindows) {
+      return {
+        fixId: allowlistedFix.id,
+        status: "blocked",
+        title: "Fix unavailable",
+        message:
+          "Real fix execution is only available inside the Windows Tauri build. No command was executed."
+      };
+    }
+
     return invokeWithMockFallback<FixExecutionResult>(
       "run_fix",
-      { fixId },
+      { fixId: allowlistedFix.id, confirmation },
       () => ({
-        fixId,
+        fixId: allowlistedFix.id,
         status: "blocked",
         title: "Fix unavailable",
         message:
@@ -74,17 +131,6 @@ export const tauriAdapter: PlatformAdapter = {
     );
   },
   async getEnvironmentInfo() {
-    return invokeWithMockFallback<EnvironmentInfo>(
-      "get_environment_info",
-      {},
-      () => ({
-        os: navigator.platform || "Unknown",
-        hostname: "Local browser",
-        appVersion: "0.1.0",
-        isAdmin: false,
-        isWindows: navigator.userAgent.toLowerCase().includes("windows"),
-        isTauri: hasTauriRuntime()
-      })
-    );
+    return getResolvedEnvironmentInfo();
   }
 };

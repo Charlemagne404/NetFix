@@ -1,5 +1,7 @@
 import type {
   EnvironmentInfo,
+  FixAction,
+  FixConfirmation,
   FixExecutionResult,
   MockScenarioId,
   ScanResult
@@ -8,7 +10,10 @@ import type {
 export type PlatformAdapter = {
   kind: "mock" | "tauri";
   runScan: (scenarioId?: MockScenarioId) => Promise<ScanResult>;
-  runFix: (fixId: string) => Promise<FixExecutionResult>;
+  runFix: (
+    fix: FixAction,
+    confirmation?: FixConfirmation
+  ) => Promise<FixExecutionResult>;
   exportReport: (scan: ScanResult, format: "json" | "html") => Promise<string>;
   getEnvironmentInfo: () => Promise<EnvironmentInfo>;
 };

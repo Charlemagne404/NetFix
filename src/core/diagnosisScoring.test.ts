@@ -17,6 +17,9 @@ describe("diagnosis scoring", () => {
     expect(scan.diagnosis.id).toBe("dhcp-failure");
     expect(scan.diagnosis.primaryFailedNodeId).toBe("ip");
     expect(scan.nodes.find((node) => node.id === "ip")?.status).toBe("failed");
+    expect(scan.diagnosis.recommendedFixes.some((fix) => fix.safety === "aggressive")).toBe(
+      false
+    );
   });
 
   it("does not recommend repairs for a healthy connection", () => {

@@ -11,20 +11,33 @@ type DiagnosticTimelineProps = {
   isScanning: boolean;
 };
 
-function connectorTone(left: DiagnosticNode, right: DiagnosticNode): string {
-  if (left.status === "failed" || right.status === "failed") {
-    return "from-rose-300/60 via-rose-300/30 to-slate-500/20";
+function connectorTone(
+  left: DiagnosticNode,
+  right: DiagnosticNode,
+  index: number,
+  primaryFailedIndex: number
+): string {
+  if (primaryFailedIndex >= 0 && index >= primaryFailedIndex) {
+    return "border-t border-dashed border-[#4b586f]/65 bg-transparent";
   }
+
+  if (right.status === "failed" || left.status === "failed") {
+    return "bg-[linear-gradient(90deg,#ff6b5e_0%,#ff6257_100%)] shadow-[0_0_14px_rgba(255,98,87,0.2)]";
+  }
+
   if (left.status === "warning" || right.status === "warning") {
-    return "from-amber-300/55 via-amber-300/25 to-slate-500/20";
+    return "bg-[linear-gradient(90deg,#f5bc48_0%,#f3c559_100%)] shadow-[0_0_10px_rgba(247,190,73,0.12)]";
   }
+
   if (left.status === "running" || right.status === "running") {
-    return "from-cyan-300/70 via-cyan-300/30 to-slate-500/20";
+    return "bg-[linear-gradient(90deg,#3dcfff_0%,#54d786_52%,#54d786_100%)] timeline-connector-flow shadow-[0_0_12px_rgba(84,215,134,0.16)]";
   }
+
   if (left.status === "ok" && right.status === "ok") {
-    return "from-emerald-300/60 via-cyan-300/35 to-cyan-300/20";
+    return "bg-[linear-gradient(90deg,#58de8a_0%,#54d786_100%)] shadow-[0_0_12px_rgba(84,215,134,0.14)]";
   }
-  return "from-slate-500/20 via-slate-500/10 to-slate-500/10";
+
+  return "border-t border-dashed border-[#4b586f]/65 bg-transparent";
 }
 
 export function DiagnosticTimeline({
@@ -40,83 +53,82 @@ export function DiagnosticTimeline({
   const primaryFailedIndex = nodes.findIndex((node) => node.status === "failed");
 
   return (
-    <section className="app-panel min-w-0 rounded-[14px] px-6 py-5">
-      <div className="relative overflow-x-auto overflow-y-hidden pb-2">
-        <div className="absolute left-[4.1rem] right-[4.1rem] top-[3.9rem] hidden xl:block">
-          <div className="grid grid-cols-9 gap-0">
-            {nodes.slice(0, -1).map((node, index) => (
-              <motion.div
-                key={`${node.id}-${nodes[index + 1]?.id}`}
-                className={cn(
-                  "h-[2px] rounded-full border-t border-dashed border-transparent bg-gradient-to-r transition-[opacity] duration-300",
-                  (activeIndex === index || activeIndex === index + 1) &&
-                    isScanning &&
-                    "timeline-connector-flow",
-                  connectorTone(node, nodes[index + 1])
-                )}
-                initial={{ scaleX: 0, opacity: 0 }}
-                animate={{
-                  scaleX:
-                    isScanning && activeIndex >= 0
-                      ? index < activeIndex
-                        ? 1
-                        : index === activeIndex
-                          ? 0.68
-                          : 0.16
-                      : 1,
-                  opacity:
-                    isScanning && activeIndex >= 0
-                      ? index <= activeIndex
-                        ? 1
-                        : 0.28
-                      : 1
-                }}
-                transition={{ delay: index * 0.04, duration: 0.42, ease: "easeOut" }}
-                style={{ transformOrigin: "left" }}
+    <section className="app-panel min-w-0 rounded-[14px] px-4 py-4 sm:px-5 sm:py-5">
+      <div className="relative overflow-x-auto overflow-y-hidden pb-1">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-full bg-[radial-gradient(circle_at_50%_0%,rgba(77,134,223,0.06),transparent_38%)]" />
+
+        <div className="relative min-w-[760px] xl:min-w-0">
+          <div className="pointer-events-none absolute left-[5%] right-[5%] top-[4.72rem]">
+            <div className="grid grid-cols-9 gap-0">
+              {nodes.slice(0, -1).map((node, index) => (
+                <motion.div
+                  key={`${node.id}-${nodes[index + 1]?.id}`}
+                  className={cn(
+                    "mx-0 h-[2px] origin-left rounded-full transition-[opacity] duration-300",
+                    connectorTone(node, nodes[index + 1], index, primaryFailedIndex)
+                  )}
+                  initial={{ scaleX: 0, opacity: 0 }}
+                  animate={{
+                    scaleX:
+                      isScanning && activeIndex >= 0
+                        ? index < activeIndex
+                          ? 1
+                          : index === activeIndex
+                            ? 0.58
+                            : 0.14
+                        : 1,
+                    opacity:
+                      isScanning && activeIndex >= 0
+                        ? index <= activeIndex
+                          ? 1
+                          : 0.34
+                        : 1
+                  }}
+                  transition={{ delay: index * 0.04, duration: 0.4, ease: "easeOut" }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-10 gap-0.5 md:gap-1 xl:gap-0.5">
+            {nodes.map((node, index) => (
+              <TimelineNode
+                key={node.id}
+                node={node}
+                index={index}
+                selected={node.id === selectedNodeId}
+                active={node.id === activeNodeId}
+                isPrimaryFailure={primaryFailedIndex === index}
+                isDownstreamOfFailure={primaryFailedIndex >= 0 && index > primaryFailedIndex}
+                isScanning={isScanning}
+                onSelect={onSelectNode}
               />
             ))}
           </div>
         </div>
-
-        <div className="grid min-w-[940px] grid-cols-10 gap-1 xl:min-w-[1020px] 2xl:min-w-[1120px]">
-          {nodes.map((node, index) => (
-            <TimelineNode
-              key={node.id}
-              node={node}
-              index={index}
-              selected={node.id === selectedNodeId}
-              active={node.id === activeNodeId}
-              isPrimaryFailure={primaryFailedIndex === index}
-              isDownstreamOfFailure={primaryFailedIndex >= 0 && index > primaryFailedIndex}
-              isScanning={isScanning}
-              onSelect={onSelectNode}
-            />
-          ))}
-        </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-6 text-sm text-slate-400">
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#54d786]" />
-          Passed
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#ff6257]" />
-          Issue
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#445066]" />
-          Pending
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,.45)]" />
-          Running
-        </span>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[13px] text-slate-400">
         <span className="text-slate-500">
           {isScanning
-            ? "Replay transitions each stage from queued to active to resolved"
-            : "Select a stage for evidence"}
+            ? "Aegis is replaying the connection chain from device to apps."
+            : "Select any stage to inspect the evidence behind it."}
         </span>
+
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#54d786] shadow-[0_0_10px_rgba(84,215,134,0.2)]" />
+            Passed
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#ff6257] shadow-[0_0_10px_rgba(255,98,87,0.2)]" />
+            Issue
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#465369]" />
+            Pending
+          </span>
+        </div>
       </div>
     </section>
   );

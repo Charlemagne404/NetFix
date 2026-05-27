@@ -14,17 +14,71 @@ type TimelineNodeProps = {
   onSelect: (id: string) => void;
 };
 
-function nodeTone(status: DiagnosticNodeType["status"]): string {
-  if (status === "ok") return "border-[#54d786]/55 text-[#54d786]";
-  if (status === "failed") return "border-[#ff6257]/55 text-[#ff6257]";
-  if (status === "warning") return "border-[#f7be49]/55 text-[#f7be49]";
-  if (status === "running") return "border-cyan-300/50 text-cyan-100";
-  return "border-[color:var(--aegis-line)] text-slate-500";
+function iconTone(
+  status: DiagnosticNodeType["status"],
+  isPrimaryFailure: boolean,
+  isDownstreamOfFailure: boolean
+): string {
+  if (isPrimaryFailure || status === "failed") {
+    return "text-[#ff6257]";
+  }
+
+  if (status === "running") {
+    return "text-cyan-100";
+  }
+
+  if (isDownstreamOfFailure || ["pending", "unknown", "skipped"].includes(status)) {
+    return "text-[#75849a]";
+  }
+
+  return "text-[#f4f7fb]";
+}
+
+function badgeTone(status: DiagnosticNodeType["status"], isPrimaryFailure: boolean): string {
+  if (isPrimaryFailure || status === "failed") {
+    return "border-[#ff6257]/80 bg-[#151b2a] text-[#ff6257] shadow-[0_0_16px_rgba(255,98,87,0.18)]";
+  }
+
+  if (status === "warning") {
+    return "border-[#f7be49]/65 bg-[#151b2a] text-[#f7be49]";
+  }
+
+  if (status === "running") {
+    return "border-cyan-300/75 bg-[#101c2c] text-cyan-100 shadow-[0_0_18px_rgba(103,232,249,0.18)]";
+  }
+
+  if (status === "ok") {
+    return "border-[#54d786]/75 bg-[#111d2d] text-[#54d786] shadow-[0_0_16px_rgba(84,215,134,0.14)]";
+  }
+
+  return "border-[#42516b] bg-[#101826] text-[#72829a]";
+}
+
+function valueTone(
+  status: DiagnosticNodeType["status"],
+  isPrimaryFailure: boolean,
+  isDownstreamOfFailure: boolean
+): string {
+  if (isPrimaryFailure || status === "failed") {
+    return "text-[#ffb0a8]";
+  }
+
+  if (status === "ok" && !isDownstreamOfFailure) {
+    return "text-slate-200";
+  }
+
+  return "text-slate-500";
 }
 
 function getTimelineValue(node: DiagnosticNodeType) {
+  const primaryValue = node.evidence[0]?.value;
+
   if (node.id === "ip" || node.id === "gateway" || node.id === "dns") {
-    return node.evidence[0]?.value ?? "—";
+    if (!primaryValue || primaryValue.length > 18) {
+      return "—";
+    }
+
+    return primaryValue;
   }
 
   if (node.id === "internet" || node.id === "windows" || node.id === "apps") {
@@ -32,6 +86,12 @@ function getTimelineValue(node: DiagnosticNodeType) {
   }
 
   return "";
+}
+
+function getTimelineLabel(node: DiagnosticNodeType) {
+  if (node.id === "ip") return "IP";
+  if (node.id === "windows") return "Windows";
+  return node.label;
 }
 
 export function TimelineNode({
@@ -45,7 +105,7 @@ export function TimelineNode({
   onSelect
 }: TimelineNodeProps) {
   const value = getTimelineValue(node);
-  const isFailed = node.status === "failed";
+  const iconClassName = iconTone(node.status, isPrimaryFailure, isDownstreamOfFailure);
   const shouldDim = isDownstreamOfFailure && !selected && !active;
 
   return (
@@ -53,110 +113,100 @@ export function TimelineNode({
       type="button"
       onClick={() => onSelect(node.id)}
       className={cn(
-        "group relative isolate flex min-h-[9rem] flex-col items-center px-1 text-center outline-none transition",
+        "group relative isolate flex min-h-[9.4rem] flex-col items-center rounded-[16px] px-2 pb-2 pt-3 text-center outline-none transition",
         selected
-          ? "rounded-[12px] bg-[rgba(118,146,188,0.05)]"
-          : "hover:rounded-[12px] hover:bg-[rgba(118,146,188,0.04)]"
+          ? "bg-[linear-gradient(180deg,rgba(45,59,81,0.16)_0%,rgba(15,23,35,0.04)_100%)]"
+          : "hover:bg-[linear-gradient(180deg,rgba(45,59,81,0.12)_0%,rgba(15,23,35,0.03)_100%)]"
       )}
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{
-        opacity: shouldDim ? 0.52 : node.status === "pending" ? 0.72 : 1,
-        y: active ? -2 : 0,
-        scale: selected ? 1.008 : 1
+        opacity: shouldDim ? 0.56 : node.status === "pending" ? 0.84 : 1,
+        y: active ? -1 : 0,
+        scale: selected ? 1.01 : 1
       }}
       transition={{ delay: index * 0.035, duration: 0.32, ease: "easeOut" }}
-      whileHover={{ y: -3 }}
+      whileHover={{ y: -2 }}
       aria-pressed={selected}
       aria-label={`${node.label}: ${node.summary}`}
     >
-      <div className="relative">
+      <div className="relative h-10 w-10">
         <span
           className={cn(
-            "pointer-events-none absolute inset-[-13px] rounded-full opacity-0 blur-xl transition duration-300",
-            active &&
-              node.status === "running" &&
-              "timeline-scan-halo opacity-100",
-            isFailed &&
-              isPrimaryFailure &&
-              "timeline-failure-halo opacity-100"
-          )}
-        />
-
-        <span
-          className={cn(
-            "pointer-events-none absolute inset-[-6px] rounded-full opacity-0 transition duration-300",
-            active &&
-              node.status === "running" &&
-              "timeline-running-ring opacity-100",
-            isFailed &&
-              isPrimaryFailure &&
-              "timeline-failure-ring opacity-100"
+            "pointer-events-none absolute inset-[-10px] rounded-full opacity-0 blur-xl transition duration-300",
+            active && node.status === "running" && "timeline-scan-halo opacity-100",
+            isPrimaryFailure && "timeline-failure-halo opacity-100"
           )}
         />
 
         <motion.div
           className={cn(
-            "relative grid h-11 w-11 place-items-center rounded-full border bg-transparent transition-[border-color,color,background-color,box-shadow] duration-300",
-            nodeTone(node.status)
+            "relative grid h-10 w-10 place-items-center rounded-full border transition-[border-color,background-color,box-shadow] duration-300",
+            isPrimaryFailure
+              ? "border-[#ff6257]/80 bg-[#ff6257]/[0.05]"
+              : selected
+                ? "border-white/10 bg-white/[0.025]"
+                : "border-transparent bg-transparent"
           )}
           animate={{
-            scale:
-              active && node.status === "running"
-                ? 1.07
-                : isFailed && isPrimaryFailure
-                  ? 1.04
-                  : 1,
+            scale: active && node.status === "running" ? 1.05 : isPrimaryFailure ? 1.03 : 1,
             boxShadow:
               active && node.status === "running"
-                ? "0 0 0 1px rgba(103,232,249,.20), 0 0 28px rgba(56,189,248,.22)"
-                : isFailed && isPrimaryFailure
-                  ? "0 0 0 1px rgba(255,98,87,.28), 0 0 38px rgba(255,98,87,.24)"
-                  : selected
-                    ? "0 0 0 1px rgba(113,139,179,.18)"
-                  : "0 0 0 0 rgba(0,0,0,0)"
+                ? "0 0 24px rgba(56,189,248,.12)"
+                : isPrimaryFailure
+                  ? "0 0 28px rgba(255,98,87,.12)"
+                  : "0 0 0 rgba(0,0,0,0)"
           }}
-          transition={{ duration: 0.34, ease: "easeOut" }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
         >
           <TimelineIcon
             name={node.icon}
             className={cn(
-              "flex h-5 w-5 items-center justify-center text-[0.68rem] font-semibold tracking-[0.02em] text-slate-100",
-              node.id === "dns" && "text-[0.58rem]",
-              (node.icon === "badge-check" || node.icon === "app-window") && "text-slate-100"
+              "flex h-5 w-5 items-center justify-center text-[0.72rem] font-medium tracking-[0.01em] sm:text-[0.74rem]",
+              node.id === "dns" && "text-[0.64rem]",
+              node.id === "ip" && "text-[0.9rem]",
+              iconClassName
             )}
           />
         </motion.div>
       </div>
 
-      <motion.span
-        className={cn(
-          "absolute top-[2.55rem] grid h-7 w-7 place-items-center rounded-full border bg-[rgba(13,22,34,0.96)]",
-          nodeTone(node.status)
-        )}
-        animate={{
-          scale: active ? 1.08 : isFailed && isPrimaryFailure ? 1.1 : 1,
-          y: isScanning && active ? -1 : 0
-        }}
-        transition={{ duration: 0.28, ease: "easeOut" }}
-      >
-        <span className="grid h-5.5 w-5.5 place-items-center rounded-full border border-current/25 bg-[rgba(13,22,34,0.96)] text-current">
-          <StatusGlyph status={node.status} className="h-3.5 w-3.5" />
-        </span>
-      </motion.span>
+      <div className="absolute left-1/2 top-[3.85rem] -translate-x-1/2">
+        <span
+          className={cn(
+            "pointer-events-none absolute inset-[-5px] rounded-full opacity-0 transition duration-300",
+            active && node.status === "running" && "timeline-running-ring opacity-100",
+            isPrimaryFailure && "timeline-failure-ring opacity-100"
+          )}
+        />
 
-      <div className="mt-[1.95rem]">
+        <motion.span
+          className={cn(
+            "relative grid h-7 w-7 place-items-center rounded-full border",
+            badgeTone(node.status, isPrimaryFailure)
+          )}
+          animate={{
+            scale: active ? 1.06 : isPrimaryFailure ? 1.08 : 1,
+            y: isScanning && active ? -1 : 0
+          }}
+          transition={{ duration: 0.28, ease: "easeOut" }}
+        >
+          <StatusGlyph status={node.status} className="h-3.5 w-3.5" />
+        </motion.span>
+      </div>
+
+      <div className="mt-[3.55rem] w-full">
         <p
           className={cn(
-            "text-[0.95rem] font-medium tracking-[0.01em] text-white transition-colors duration-300",
-            isFailed && isPrimaryFailure && "text-[#fff1ee]"
+            "text-[0.8rem] font-medium tracking-[0.01em] transition-colors duration-300 sm:text-[0.92rem]",
+            isPrimaryFailure ? "text-white" : shouldDim ? "text-slate-400" : "text-slate-100"
           )}
         >
-          {node.label}
+          {getTimelineLabel(node)}
         </p>
         <p
           className={cn(
-            "mt-1.5 min-h-5 text-[0.88rem] transition-colors duration-300",
-            isFailed && isPrimaryFailure ? "text-[#ffc8c2]" : "text-slate-300"
+            "mt-2 min-h-[1.2rem] truncate text-[0.76rem] transition-colors duration-300 sm:text-[0.84rem]",
+            valueTone(node.status, isPrimaryFailure, isDownstreamOfFailure)
           )}
         >
           {value || "\u00a0"}

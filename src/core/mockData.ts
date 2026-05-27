@@ -434,7 +434,6 @@ function scenarioPatches(id: MockScenarioId): NodePatch[] {
           recommendedFixes: getFixActions([
             "renew-dhcp",
             "restart-adapter",
-            "tcpip-reset",
             "open-network-settings"
           ]),
           rawOutput:

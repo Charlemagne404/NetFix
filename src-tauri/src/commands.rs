@@ -1,6 +1,6 @@
 use crate::diagnostics::{
     environment_info, export_local_report, generate_wlan_report_impl, run_allowlisted_fix,
-    run_windows_scan, EnvironmentInfo, FixExecutionResult, ScanResult,
+    run_windows_scan, EnvironmentInfo, FixConfirmation, FixExecutionResult, ScanResult,
 };
 
 #[tauri::command]
@@ -9,8 +9,11 @@ pub async fn run_scan(scenario_id: Option<String>) -> Result<ScanResult, String>
 }
 
 #[tauri::command]
-pub async fn run_fix(fix_id: String) -> Result<FixExecutionResult, String> {
-    run_allowlisted_fix(&fix_id).map_err(|error| error.to_string())
+pub async fn run_fix(
+    fix_id: String,
+    confirmation: Option<FixConfirmation>,
+) -> Result<FixExecutionResult, String> {
+    run_allowlisted_fix(&fix_id, confirmation.as_ref()).map_err(|error| error.to_string())
 }
 
 #[tauri::command]

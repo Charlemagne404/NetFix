@@ -3,7 +3,6 @@ import {
   BadgeCheck,
   Binary,
   Check,
-  CircleDashed,
   LayoutGrid,
   LaptopMinimal,
   Clock3,
@@ -19,6 +18,7 @@ import {
   X
 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
+import { cn } from "@/utils/cn";
 
 type IconProps = {
   className?: string;
@@ -106,10 +106,20 @@ export function StatusGlyph({
   className?: string;
 }) {
   if (status === "ok") return <Check className={className} strokeWidth={2.4} />;
-  if (status === "failed") return <X className={className} strokeWidth={2.4} />;
+  if (status === "failed") {
+    return (
+      <span className={cn("inline-flex items-center justify-center font-semibold leading-none", className)}>
+        !
+      </span>
+    );
+  }
   if (status === "warning") {
     return <TriangleAlert className={className} strokeWidth={2.2} />;
   }
   if (status === "running") return <Clock3 className={className} strokeWidth={2} />;
-  return <CircleDashed className={className} strokeWidth={2} />;
+  return (
+    <span className={cn("inline-flex items-center justify-center font-semibold leading-none", className)}>
+      -
+    </span>
+  );
 }

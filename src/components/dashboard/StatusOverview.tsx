@@ -18,13 +18,10 @@ export function StatusOverview({
   completedChecks,
   lastRunAt,
   isScanning,
-  onRunScan,
-  onViewReport
+  onRunScan
 }: StatusOverviewProps) {
-  const statusHeadline =
-    diagnosis.severity === "info" || diagnosis.severity === "low"
-      ? "Connection looks healthy"
-      : "Problems detected";
+  const isProblemState = !["info", "low"].includes(diagnosis.severity);
+  const statusHeadline = isProblemState ? "Problems detected" : "Connection looks healthy";
   const severityBars = {
     info: 2,
     low: 3,
@@ -43,23 +40,37 @@ export function StatusOverview({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
-      className="app-panel min-w-0 overflow-hidden rounded-[14px] px-6 py-5"
+      className="app-panel relative min-w-0 overflow-hidden rounded-[14px] px-5 py-4"
     >
-      <div className="grid gap-5 2xl:grid-cols-[1.72fr_0.95fr_1.08fr_auto] 2xl:items-center">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="grid h-[82px] w-[82px] place-items-center rounded-full border border-[#ff6a5a]/30 bg-[#ff6a5a]/[0.05] text-[#ff6a5a] shadow-[0_0_36px_rgba(255,106,90,0.1)]">
-            {diagnosis.severity === "high" || diagnosis.severity === "critical" ? (
-              <AlertCircle className="h-10 w-10" strokeWidth={1.7} />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_0%,rgba(255,103,86,0.08),transparent_24%),radial-gradient(circle_at_100%_0%,rgba(49,116,255,0.06),transparent_28%)]" />
+
+      <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1.58fr)_minmax(0,0.8fr)_minmax(0,0.95fr)_minmax(248px,0.9fr)] xl:items-center">
+        <div className="flex min-w-0 items-center gap-4">
+          <div
+            className={cn(
+              "relative grid h-[82px] w-[82px] shrink-0 place-items-center rounded-full border shadow-[0_0_44px_rgba(255,106,90,0.08)]",
+              isProblemState
+                ? "border-[#ff6a5a]/35 bg-[#ff6a5a]/[0.05] text-[#ff6a5a]"
+                : "border-[#54d786]/30 bg-[#54d786]/[0.05] text-[#54d786]"
+            )}
+          >
+            {isProblemState ? (
+              <>
+                <Wifi className="h-10 w-10" strokeWidth={1.8} />
+                <span className="absolute bottom-1.5 right-1.5 grid h-7 w-7 place-items-center rounded-full border border-[#ff6a5a] bg-[#111c2c] text-[#ff6a5a] shadow-[0_0_24px_rgba(255,98,87,0.18)]">
+                  <AlertCircle className="h-4 w-4" strokeWidth={2} />
+                </span>
+              </>
             ) : (
-              <Wifi className="h-10 w-10" strokeWidth={1.7} />
+              <Wifi className="h-10 w-10" strokeWidth={1.8} />
             )}
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-[1.12rem] font-semibold tracking-[0.01em] text-white 2xl:text-[1.2rem]">
+            <h2 className="text-[1.7rem] font-semibold tracking-[-0.02em] text-white">
               {isScanning ? "Running diagnostics" : statusHeadline}
             </h2>
-            <p className="mt-2 max-w-[33rem] text-[0.98rem] leading-7 text-slate-300">
+            <p className="mt-1.5 max-w-[34rem] text-[0.97rem] leading-7 text-slate-300">
               {isScanning
                 ? "Aegis is stepping through the connection chain so the recommendation stays tied to the actual break point."
                 : diagnosis.summary}
@@ -67,19 +78,28 @@ export function StatusOverview({
           </div>
         </div>
 
-        <div className="border-[color:var(--aegis-line)] 2xl:border-l 2xl:pl-8">
-          <p className="text-sm text-slate-400">Severity</p>
-          <div className="mt-2 flex items-center gap-4">
-            <p className="text-[1.55rem] font-medium text-[#ff6a5a]">
+        <div className="border-[color:var(--aegis-line)] xl:border-l xl:pl-8">
+          <p className="text-[0.96rem] text-slate-400">Severity</p>
+          <div className="mt-3 flex items-center gap-4">
+            <p
+              className={cn(
+                "text-[1.2rem] font-medium tracking-[-0.02em]",
+                isProblemState ? "text-[#ff6a5a]" : "text-[#54d786]"
+              )}
+            >
               {severityLabels[diagnosis.severity]}
             </p>
             <div className="flex gap-1.5">
-              {Array.from({ length: 7 }, (_, index) => (
+              {Array.from({ length: 8 }, (_, index) => (
                 <span
                   key={index}
                   className={cn(
-                    "h-2.5 w-8 rounded-full",
-                    index < severityBars ? "bg-[#ff6257]" : "bg-[#263348]"
+                    "h-[7px] w-6 rounded-full xl:w-7",
+                    index < severityBars
+                      ? isProblemState
+                        ? "bg-[#ff6257] shadow-[0_0_10px_rgba(255,98,87,0.16)]"
+                        : "bg-[#54d786] shadow-[0_0_10px_rgba(84,215,134,0.14)]"
+                      : "bg-[#263349]"
                   )}
                 />
               ))}
@@ -87,36 +107,31 @@ export function StatusOverview({
           </div>
         </div>
 
-        <div className="border-[color:var(--aegis-line)] 2xl:border-l 2xl:pl-8">
-          <p className="text-sm text-slate-400">Diagnostics completed</p>
-          <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-[1.02rem] text-slate-200">
+        <div className="border-[color:var(--aegis-line)] xl:border-l xl:pl-8">
+          <p className="text-[0.96rem] text-slate-400">Diagnostics completed</p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.98rem] text-slate-200">
             <span>{completedChecks} tests run</span>
             <span className="text-slate-500">|</span>
             <span>Duration: 00:{durationSeconds}</span>
           </div>
         </div>
 
-        <div className="2xl:justify-self-end">
-          <p className="text-right text-sm text-slate-400">Last run: Today, {lastRunLabel}</p>
-          <div className="mt-3 flex flex-wrap justify-end gap-3">
-            <button
-              type="button"
-              onClick={onViewReport}
-              className="app-outline-button rounded-[12px] px-4 py-2.5 text-sm font-medium"
-            >
-              Report
-            </button>
-            <button
-              type="button"
-              onClick={onRunScan}
-              disabled={isScanning}
-              className="app-primary-button inline-flex items-center gap-3 rounded-[12px] px-5 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
-            >
+        <div className="xl:justify-self-end">
+          <p className="text-right text-[0.92rem] text-slate-400">Last run: Today, {lastRunLabel}</p>
+          <button
+            type="button"
+            onClick={onRunScan}
+            disabled={isScanning}
+            className="app-primary-button mt-3 inline-flex min-h-[42px] w-full items-center justify-between overflow-hidden rounded-[8px] border-[#2c74e5] px-0 text-[0.96rem] font-medium disabled:cursor-not-allowed disabled:opacity-60 xl:min-w-[248px]"
+          >
+            <span className="inline-flex flex-1 items-center justify-center gap-3 px-5">
               <Play className={cn("h-4 w-4", isScanning && "animate-pulse")} fill="currentColor" />
-              {isScanning ? "Running" : "Run Diagnosis"}
-              <ChevronDown className="h-4 w-4 opacity-70" />
-            </button>
-          </div>
+              {isScanning ? "Running diagnostics" : "Run Diagnosis"}
+            </span>
+            <span className="flex h-full items-center border-l border-white/10 px-3.5 text-white/75">
+              <ChevronDown className="h-4 w-4" />
+            </span>
+          </button>
         </div>
       </div>
     </motion.section>

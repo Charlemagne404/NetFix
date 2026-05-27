@@ -1,13 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
-import type { FixAction } from "@/core/types";
+import type { FixAction, FixConfirmation } from "@/core/types";
 import { SafetyPill } from "@/components/common/SafetyPill";
+import {
+  AGGRESSIVE_CONFIRMATION_PHRASE,
+  buildFixConfirmation,
+  requiresExplicitConfirmation,
+  requiresTypedConfirmation
+} from "@/core/fixRegistry";
 
 type ConfirmFixModalProps = {
   fix: FixAction | null;
   busy: boolean;
   onCancel: () => void;
-  onConfirm: (fix: FixAction) => void;
+  onConfirm: (fix: FixAction, confirmation?: FixConfirmation) => void;
 };
 
 export function ConfirmFixModal({
@@ -17,11 +23,21 @@ export function ConfirmFixModal({
   onConfirm
 }: ConfirmFixModalProps) {
   const [confirmation, setConfirmation] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  useEffect(() => {
+    setConfirmation("");
+    setAcknowledged(false);
+  }, [fix?.id]);
 
   if (!fix) return null;
 
-  const requiresResetText = fix.safety === "aggressive";
-  const canConfirm = !busy && (!requiresResetText || confirmation === "RESET");
+  const needsExplicitConfirmation = requiresExplicitConfirmation(fix.safety);
+  const requiresResetText = requiresTypedConfirmation(fix.safety);
+  const canConfirm =
+    !busy &&
+    (!needsExplicitConfirmation || acknowledged) &&
+    (!requiresResetText || confirmation === AGGRESSIVE_CONFIRMATION_PHRASE);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/72 p-4 backdrop-blur-xl">
@@ -73,14 +89,29 @@ export function ConfirmFixModal({
           </pre>
         </div>
 
+        {needsExplicitConfirmation ? (
+          <label className="mt-4 flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={acknowledged}
+              onChange={(event) => setAcknowledged(event.target.checked)}
+              className="mt-1 h-4 w-4 shrink-0 accent-cyan-300"
+            />
+            <span className="leading-6">
+              I reviewed the command preview and understand the impact of this
+              {fix.safety === "aggressive" ? " last-resort" : ""} action.
+            </span>
+          </label>
+        ) : null}
+
         {requiresResetText ? (
           <label className="mt-4 block text-sm text-slate-300">
-            Type RESET to unlock this aggressive action.
+            Type {AGGRESSIVE_CONFIRMATION_PHRASE} to unlock this aggressive action.
             <input
               value={confirmation}
               onChange={(event) => setConfirmation(event.target.value)}
               className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-rose-300/50 focus:ring-2 focus:ring-rose-300/20"
-              placeholder="RESET"
+              placeholder={AGGRESSIVE_CONFIRMATION_PHRASE}
             />
           </label>
         ) : null}
@@ -96,7 +127,9 @@ export function ConfirmFixModal({
           </button>
           <button
             type="button"
-            onClick={() => onConfirm(fix)}
+            onClick={() =>
+              onConfirm(fix, buildFixConfirmation(fix.safety, confirmation))
+            }
             disabled={!canConfirm}
             className="rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
           >

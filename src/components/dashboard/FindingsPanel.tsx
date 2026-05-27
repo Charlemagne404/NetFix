@@ -50,10 +50,10 @@ function statusTone(status: DiagnosticStatus) {
 }
 
 function rowTone(status: DiagnosticStatus) {
-  if (status === "failed") return "border-[#ff6a5a]/25 bg-[#ff6a5a]/[0.04]";
-  if (status === "warning") return "border-[#f7be49]/25 bg-[#f7be49]/[0.04]";
-  if (status === "ok") return "border-[#54d786]/25 bg-[#54d786]/[0.04]";
-  return "border-[color:var(--aegis-line-soft)] bg-[rgba(118,146,188,0.04)]";
+  if (status === "failed") return "bg-[#ff6a5a]/[0.06]";
+  if (status === "warning") return "bg-[#f7be49]/[0.06]";
+  if (status === "ok") return "bg-[#54d786]/[0.05]";
+  return "bg-[rgba(118,146,188,0.04)]";
 }
 
 export function FindingsPanel({
@@ -68,65 +68,66 @@ export function FindingsPanel({
   const selectedNode = rows.find((node) => node.id === selectedNodeId) ?? rows[0] ?? scan.nodes[0];
 
   return (
-    <section className="app-panel min-w-0 flex h-[360px] flex-col rounded-[14px]">
-      <div className="border-b border-[color:var(--aegis-line-soft)] px-6 py-4">
-        <h2 className="text-[1.05rem] font-semibold tracking-[0.01em] text-white">What we found</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-400">
+    <section className="app-panel min-w-0 flex min-h-[18rem] flex-col rounded-[14px] lg:h-full lg:min-h-0">
+      <div className="border-b border-[color:var(--aegis-line-soft)] px-6 py-5">
+        <h2 className="text-[1.02rem] font-semibold tracking-[0.01em] text-white">What we found</h2>
+        <p className="mt-1 text-[0.92rem] leading-6 text-slate-400">
           Aegis highlights the symptoms with the clearest evidence first.
         </p>
       </div>
 
-      <div className="hide-scrollbar min-h-0 flex-1 overflow-auto px-4 py-3">
-        {rows.map((node) => (
-          <button
-            key={node.id}
-            type="button"
-            onClick={() => onSelectNode(node.id)}
-            className={cn(
-              "flex w-full items-start gap-4 rounded-[12px] border px-4 py-3 text-left transition",
-              node.id === selectedNode?.id
-                ? `${rowTone(node.status)} shadow-[0_0_0_1px_rgba(56,213,255,0.06)]`
-                : "border-transparent hover:border-[color:var(--aegis-line-soft)] hover:bg-[rgba(118,146,188,0.04)]"
-            )}
-          >
-            <span
+      <div className="hide-scrollbar min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-5">
+        <div className="overflow-hidden rounded-[14px] border border-[color:var(--aegis-line-soft)] bg-[linear-gradient(180deg,rgba(15,24,36,0.88)_0%,rgba(11,20,31,0.94)_100%)] shadow-[inset_0_1px_0_rgba(170,192,224,0.02)]">
+          {rows.map((node, index) => (
+            <button
+              key={node.id}
+              type="button"
+              onClick={() => onSelectNode(node.id)}
               className={cn(
-                "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-current/30 bg-black/15",
-                statusTone(node.status)
+                "flex w-full items-start gap-3.5 px-4 py-2.5 text-left transition sm:gap-4 sm:px-5",
+                index !== rows.length - 1 && "border-b border-[color:var(--aegis-line-soft)]",
+                node.id === selectedNode?.id
+                  ? `${rowTone(node.status)} shadow-[inset_0_0_0_1px_rgba(120,154,206,0.06)]`
+                  : "hover:bg-[rgba(118,146,188,0.04)]"
               )}
             >
-              <StatusGlyph status={node.status} className="h-3.5 w-3.5" />
-            </span>
+              <span
+                className={cn(
+                  "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-current/30 bg-black/10",
+                  statusTone(node.status)
+                )}
+              >
+                <StatusGlyph status={node.status} className="h-3.5 w-3.5" />
+              </span>
 
-            <span className="min-w-0 flex-1">
-              <span className="flex items-start justify-between gap-4">
-                <span className="min-w-0">
-                  <span className="block truncate text-[1.02rem] font-medium tracking-[0.01em] text-white">
-                    {node.summary}
+              <span className="min-w-0 flex-1">
+                <span className="flex items-start gap-4">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[1.03rem] font-medium tracking-[0.01em] text-white">
+                      {node.summary}
+                    </span>
+                    <span className="mt-1 block max-w-[33rem] truncate text-[0.9rem] leading-5 text-slate-400">
+                      {compactDetail(node.explanation)}
+                    </span>
                   </span>
-                  <span className="mt-1 block max-w-[34rem] text-sm leading-6 text-slate-400">
-                    {compactDetail(node.explanation)}
+                  <span className="hidden shrink-0 items-center gap-3 pl-3 sm:flex">
+                    <span className={cn("text-[0.98rem] font-medium", statusTone(node.status))}>
+                      {getFindingValue(node)}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-500" />
                   </span>
-                </span>
-                <span
-                  className={cn(
-                    "hidden shrink-0 text-sm font-medium sm:inline",
-                    statusTone(node.status)
-                  )}
-                >
-                  {getFindingValue(node)}
                 </span>
               </span>
-            </span>
 
-            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500" />
-          </button>
-        ))}
+              <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-500 sm:hidden" />
+            </button>
+          ))}
+        </div>
       </div>
 
       {selectedNode ? (
         <div className="border-t border-[color:var(--aegis-line-soft)] px-6 py-4">
-          <div className="flex flex-wrap items-center gap-5">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <button
               type="button"
               onClick={onViewReport}

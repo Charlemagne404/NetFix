@@ -1,5 +1,5 @@
 import { createMockScanResult } from "@/core/mockData";
-import { getFixAction } from "@/core/fixRegistry";
+import { getFixAction, isAllowlistedFixId } from "@/core/fixRegistry";
 import { buildHtmlReport, buildJsonReport, downloadTextFile } from "@/core/reportExport";
 import type { PlatformAdapter } from "./platformAdapter";
 
@@ -11,17 +11,29 @@ export const mockAdapter: PlatformAdapter = {
     await wait(250);
     return createMockScanResult(scenarioId);
   },
-  async runFix(fixId) {
-    const fix = getFixAction(fixId);
+  async runFix(fix, confirmation) {
+    if (!isAllowlistedFixId(fix.id)) {
+      return {
+        fixId: fix.id,
+        status: "blocked",
+        title: "Unknown fix",
+        message: "The requested fix ID is not in the frontend allowlist.",
+        requiresAdmin: false
+      };
+    }
+
+    const allowlistedFix = getFixAction(fix.id);
     await wait(450);
     return {
-      fixId,
+      fixId: fix.id,
       status: "simulated",
-      title: fix.title,
+      title: allowlistedFix.title,
       message:
-        "Demo mode simulated the fix. No command was executed and no system setting was changed.",
-      stdout: fix.commandsPreview?.join("\n"),
-      requiresAdmin: fix.requiresAdmin
+        confirmation?.acknowledged
+          ? "Demo mode simulated the confirmed allowlisted fix. No command was executed and no system setting was changed."
+          : "Demo mode simulated the fix. No command was executed and no system setting was changed.",
+      stdout: allowlistedFix.commandsPreview?.join("\n"),
+      requiresAdmin: allowlistedFix.requiresAdmin
     };
   },
   async exportReport(scan, format) {
