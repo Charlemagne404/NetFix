@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createMockScanResult } from "@/core/mockData";
-import { getFixAction, isAllowlistedFixId } from "@/core/fixRegistry";
+import { isAllowlistedFixId } from "@/core/fixRegistry";
 import { buildHtmlReport, buildJsonReport } from "@/core/reportExport";
 import type {
   EnvironmentInfo,
@@ -91,11 +91,10 @@ export const tauriAdapter: PlatformAdapter = {
       };
     }
 
-    const allowlistedFix = getFixAction(fix.id);
     const environment = await getResolvedEnvironmentInfo();
     if (!environment.isWindows) {
       return {
-        fixId: allowlistedFix.id,
+        fixId: fix.id,
         status: "blocked",
         title: "Fix unavailable",
         message:
@@ -105,9 +104,9 @@ export const tauriAdapter: PlatformAdapter = {
 
     return invokeWithMockFallback<FixExecutionResult>(
       "run_fix",
-      { fixId: allowlistedFix.id, confirmation },
+      { fixId: fix.id, confirmation },
       () => ({
-        fixId: allowlistedFix.id,
+        fixId: fix.id,
         status: "blocked",
         title: "Fix unavailable",
         message:

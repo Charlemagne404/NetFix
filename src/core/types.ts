@@ -15,6 +15,15 @@ export type AppMode = "normal" | "technician";
 
 export type ThemeMode = "system" | "dark" | "light";
 
+export type ScanHistoryReason = "manual" | "scenario" | "verification";
+
+export type RepairVerificationStatus =
+  | "resolved"
+  | "improved"
+  | "unchanged"
+  | "worse"
+  | "blocked";
+
 export type MockScenarioId =
   | "healthy"
   | "dns-failure"
@@ -107,4 +116,38 @@ export type FixExecutionResult = {
 export type EnvironmentInfo = ScanResult["environment"] & {
   isWindows: boolean;
   isTauri: boolean;
+};
+
+export type RepairNodeTransition = {
+  nodeId: string;
+  label: string;
+  beforeStatus: DiagnosticStatus;
+  afterStatus: DiagnosticStatus;
+  beforeSummary: string;
+  afterSummary: string;
+};
+
+export type RepairVerification = {
+  id: string;
+  fixId: string;
+  fixTitle: string;
+  status: RepairVerificationStatus;
+  verifiedAt: string;
+  beforeScanId: string;
+  afterScanId?: string;
+  beforeDiagnosis: string;
+  afterDiagnosis?: string;
+  summary: string;
+  detail: string;
+  changedNodes: RepairNodeTransition[];
+};
+
+export type ScanHistoryEntry = {
+  id: string;
+  capturedAt: string;
+  reason: ScanHistoryReason;
+  scenarioId?: MockScenarioId;
+  relatedFixId?: string;
+  relatedFixTitle?: string;
+  scan: ScanResult;
 };

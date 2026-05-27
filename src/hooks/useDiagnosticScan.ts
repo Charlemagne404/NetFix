@@ -62,6 +62,14 @@ export function useDiagnosticScan({
 
   const isStaleRun = (runId: number) => runIdRef.current !== runId;
 
+  const loadScan = useCallback((nextScan: ScanResult) => {
+    runIdRef.current += 1;
+    setScanResult(nextScan);
+    setDisplayNodes(nextScan.nodes);
+    setActiveNodeId(undefined);
+    setIsScanning(false);
+  }, []);
+
   const runScan = useCallback(
     async (scenarioId?: MockScenarioId) => {
       const runId = runIdRef.current + 1;
@@ -71,18 +79,18 @@ export function useDiagnosticScan({
       setActiveNodeId(scanResult.nodes[0]?.id);
 
       const finalScan = await runDiagnosticEngine(adapter, scenarioId);
-      if (isStaleRun(runId)) return;
+      if (isStaleRun(runId)) return undefined;
 
       setDisplayNodes(buildPendingNodes(finalScan.nodes));
       setActiveNodeId(finalScan.nodes[0]?.id);
       await wait(REPLAY_PREP_MS);
 
       for (let index = 0; index < finalScan.nodes.length; index += 1) {
-        if (isStaleRun(runId)) return;
+        if (isStaleRun(runId)) return undefined;
         setActiveNodeId(finalScan.nodes[index]?.id);
         setDisplayNodes(buildReplayNodes(finalScan.nodes, index, index - 1));
         await wait(REPLAY_RUNNING_MS);
-        if (isStaleRun(runId)) return;
+        if (isStaleRun(runId)) return undefined;
         setDisplayNodes(buildReplayNodes(finalScan.nodes, null, index));
         await wait(
           finalScan.nodes[index]?.status === "failed"
@@ -91,12 +99,13 @@ export function useDiagnosticScan({
         );
       }
 
-      if (isStaleRun(runId)) return;
+      if (isStaleRun(runId)) return undefined;
       setScanResult(finalScan);
       setDisplayNodes(finalScan.nodes);
       setActiveNodeId(undefined);
       setIsScanning(false);
       onScanComplete?.(finalScan);
+      return finalScan;
     },
     [adapter, onScanComplete]
   );
@@ -106,6 +115,7 @@ export function useDiagnosticScan({
     displayNodes,
     isScanning,
     activeNodeId,
-    runScan
+    runScan,
+    loadScan
   };
 }

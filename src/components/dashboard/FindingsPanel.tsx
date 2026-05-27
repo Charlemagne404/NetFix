@@ -134,7 +134,7 @@ export function FindingsPanel({
               className="inline-flex items-center gap-2 text-sm font-medium text-[#4b8dff] transition hover:text-[#78aaff]"
             >
               <Eye className="h-4 w-4" />
-              View full details
+              Open full report
             </button>
 
             {mode !== "technician" ? (

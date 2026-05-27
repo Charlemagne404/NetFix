@@ -13,8 +13,10 @@ The app is mock-first so the full interface works on non-Windows machines. Real 
 - Typed diagnostic model, scoring logic, ranked fix registry, and platform abstraction.
 - Normal and Technician modes.
 - Safe fix previews and confirmation modal before execution.
+- Automatic repair verification with before/after timeline comparison.
+- Persistent local scan history with restore-to-workspace behavior.
 - Local JSON/HTML report generation.
-- Tauri v2 backend scaffold with read-only Windows diagnostics and allowlisted safe fix execution.
+- Tauri v2 backend with comprehensive Windows probes, richer confidence-based diagnosis, and allowlisted repair execution.
 
 ## Safety And Privacy
 
@@ -27,7 +29,7 @@ Aegis is designed to diagnose before repairing.
 - Frontend sends scan requests and fix IDs only.
 - Backend maps fix IDs to fixed allowlisted commands.
 - Every fix shows command previews before execution.
-- Moderate and aggressive fixes are registered as advanced and blocked in the v0.1 backend until Windows validation is complete.
+- Moderate and aggressive fixes stay allowlisted, previewed, and confirmation-gated. Targeted adapter/profile fixes resolve their own context inside the backend before execution.
 - Exported reports stay local and include a privacy warning because they may contain adapter names, IP addresses, DNS servers, and command output.
 
 ## Development
@@ -122,7 +124,8 @@ v0.2:
 
 v0.3:
 - Safe fixes
-- Export case files
+- Automatic repair verification
+- Local-only scan history
 
 v0.4:
 - Technician mode
@@ -136,5 +139,4 @@ v0.5:
 v1.0:
 - Installer
 - Signed builds if possible
-- Full repair flow
-- Local-only scan history
+- Export case files
