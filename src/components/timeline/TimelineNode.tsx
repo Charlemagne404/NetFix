@@ -8,6 +8,7 @@ type TimelineNodeProps = {
   index: number;
   selected: boolean;
   active: boolean;
+  liveComplete: boolean;
   isPrimaryFailure: boolean;
   isDownstreamOfFailure: boolean;
   isScanning: boolean;
@@ -16,6 +17,7 @@ type TimelineNodeProps = {
 
 function iconTone(
   status: DiagnosticNodeType["status"],
+  liveComplete: boolean,
   isPrimaryFailure: boolean,
   isDownstreamOfFailure: boolean
 ): string {
@@ -27,6 +29,10 @@ function iconTone(
     return "text-cyan-100";
   }
 
+  if (liveComplete) {
+    return "text-[#d8f7ff]";
+  }
+
   if (isDownstreamOfFailure || ["pending", "unknown", "skipped"].includes(status)) {
     return "text-[#75849a]";
   }
@@ -34,7 +40,11 @@ function iconTone(
   return "text-[#f4f7fb]";
 }
 
-function badgeTone(status: DiagnosticNodeType["status"], isPrimaryFailure: boolean): string {
+function badgeTone(
+  status: DiagnosticNodeType["status"],
+  liveComplete: boolean,
+  isPrimaryFailure: boolean
+): string {
   if (isPrimaryFailure || status === "failed") {
     return "border-[#ff6257]/80 bg-[#151b2a] text-[#ff6257] shadow-[0_0_16px_rgba(255,98,87,0.18)]";
   }
@@ -47,6 +57,10 @@ function badgeTone(status: DiagnosticNodeType["status"], isPrimaryFailure: boole
     return "border-cyan-300/75 bg-[#101c2c] text-cyan-100 shadow-[0_0_18px_rgba(103,232,249,0.18)]";
   }
 
+  if (liveComplete) {
+    return "border-cyan-300/50 bg-[#0f1c2c] text-cyan-100 shadow-[0_0_14px_rgba(56,189,248,0.12)]";
+  }
+
   if (status === "ok") {
     return "border-[#54d786]/75 bg-[#111d2d] text-[#54d786] shadow-[0_0_16px_rgba(84,215,134,0.14)]";
   }
@@ -56,11 +70,16 @@ function badgeTone(status: DiagnosticNodeType["status"], isPrimaryFailure: boole
 
 function valueTone(
   status: DiagnosticNodeType["status"],
+  liveComplete: boolean,
   isPrimaryFailure: boolean,
   isDownstreamOfFailure: boolean
 ): string {
   if (isPrimaryFailure || status === "failed") {
     return "text-[#ffb0a8]";
+  }
+
+  if (liveComplete) {
+    return "text-[#9dc6d8]";
   }
 
   if (status === "ok" && !isDownstreamOfFailure) {
@@ -71,6 +90,14 @@ function valueTone(
 }
 
 function getTimelineValue(node: DiagnosticNodeType) {
+  if (node.progressState === "running") {
+    return "Checking...";
+  }
+
+  if (node.progressState === "checked") {
+    return "Captured";
+  }
+
   const primaryValue = node.evidence[0]?.value;
 
   if (node.id === "ip" || node.id === "gateway" || node.id === "dns") {
@@ -99,13 +126,19 @@ export function TimelineNode({
   index,
   selected,
   active,
+  liveComplete,
   isPrimaryFailure,
   isDownstreamOfFailure,
   isScanning,
   onSelect
 }: TimelineNodeProps) {
   const value = getTimelineValue(node);
-  const iconClassName = iconTone(node.status, isPrimaryFailure, isDownstreamOfFailure);
+  const iconClassName = iconTone(
+    node.status,
+    liveComplete,
+    isPrimaryFailure,
+    isDownstreamOfFailure
+  );
   const shouldDim = isDownstreamOfFailure && !selected && !active;
 
   return (
@@ -134,6 +167,7 @@ export function TimelineNode({
           className={cn(
             "pointer-events-none absolute inset-[-10px] rounded-full opacity-0 blur-xl transition duration-300",
             active && node.status === "running" && "timeline-scan-halo opacity-100",
+            liveComplete && "bg-cyan-400/20 opacity-100",
             isPrimaryFailure && "timeline-failure-halo opacity-100"
           )}
         />
@@ -143,6 +177,8 @@ export function TimelineNode({
             "relative grid h-10 w-10 place-items-center rounded-full border transition-[border-color,background-color,box-shadow] duration-300",
             isPrimaryFailure
               ? "border-[#ff6257]/80 bg-[#ff6257]/[0.05]"
+              : liveComplete
+                ? "border-cyan-300/45 bg-cyan-400/[0.06]"
               : selected
                 ? "border-white/10 bg-white/[0.025]"
                 : "border-transparent bg-transparent"
@@ -175,6 +211,7 @@ export function TimelineNode({
           className={cn(
             "pointer-events-none absolute inset-[-5px] rounded-full opacity-0 transition duration-300",
             active && node.status === "running" && "timeline-running-ring opacity-100",
+            liveComplete && "bg-cyan-400/10 opacity-100",
             isPrimaryFailure && "timeline-failure-ring opacity-100"
           )}
         />
@@ -182,7 +219,7 @@ export function TimelineNode({
         <motion.span
           className={cn(
             "relative grid h-7 w-7 place-items-center rounded-full border",
-            badgeTone(node.status, isPrimaryFailure)
+            badgeTone(node.status, liveComplete, isPrimaryFailure)
           )}
           animate={{
             scale: active ? 1.06 : isPrimaryFailure ? 1.08 : 1,
@@ -190,7 +227,10 @@ export function TimelineNode({
           }}
           transition={{ duration: 0.28, ease: "easeOut" }}
         >
-          <StatusGlyph status={node.status} className="h-3.5 w-3.5" />
+          <StatusGlyph
+            status={liveComplete && node.status === "pending" ? "ok" : node.status}
+            className="h-3.5 w-3.5"
+          />
         </motion.span>
       </div>
 
@@ -206,7 +246,7 @@ export function TimelineNode({
         <p
           className={cn(
             "mt-2 min-h-[1.2rem] truncate text-[0.76rem] transition-colors duration-300 sm:text-[0.84rem]",
-            valueTone(node.status, isPrimaryFailure, isDownstreamOfFailure)
+            valueTone(node.status, liveComplete, isPrimaryFailure, isDownstreamOfFailure)
           )}
         >
           {value || "\u00a0"}

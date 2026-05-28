@@ -25,6 +25,7 @@ import {
 } from "@/core/scanHistory";
 import type {
   AppMode,
+  EnvironmentInfo,
   FixAction,
   FixConfirmation,
   FixExecutionResult,
@@ -36,8 +37,12 @@ import type {
   ThemeMode
 } from "@/core/types";
 import { useDiagnosticScan } from "@/hooks/useDiagnosticScan";
+import { useFooterMetrics } from "@/hooks/useFooterMetrics";
 import { mockAdapter } from "@/platform/mockAdapter";
 import { tauriAdapter } from "@/platform/tauriAdapter";
+import { TimeoutError, withTimeout } from "@/utils/async";
+
+const FIX_EXECUTION_TIMEOUT_MS = 45_000;
 
 type PendingHistoryCapture = {
   reason: ScanHistoryReason;
@@ -93,6 +98,11 @@ export default function App() {
   const [pendingFix, setPendingFix] = useState<FixAction | null>(null);
   const [fixBusy, setFixBusy] = useState(false);
   const [fixResult, setFixResult] = useState<FixExecutionResult | null>(null);
+  const [environmentInfo, setEnvironmentInfo] = useState<EnvironmentInfo>({
+    ...initialAppState.initialScan.environment,
+    isWindows: false,
+    isTauri: false
+  });
   const [repairVerification, setRepairVerification] =
     useState<RepairVerification | null>(null);
   const [isVerifyingFix, setIsVerifyingFix] = useState(false);
@@ -105,21 +115,30 @@ export default function App() {
   });
 
   const adapter = useMemo(() => (demoMode ? mockAdapter : tauriAdapter), [demoMode]);
+  const footerMetrics = useFooterMetrics(adapter);
 
-  const { scanResult, displayNodes, isScanning, activeNodeId, runScan, loadScan } =
-    useDiagnosticScan({
-      adapter,
-      initialScan: initialAppState.initialScan,
-      onScanComplete: (scan) => {
-        setSelectedNodeId(scan.diagnosis.primaryFailedNodeId ?? scan.nodes[0]?.id);
-        setScanHistory((currentHistory) =>
-          upsertScanHistoryEntry(
-            currentHistory,
-            createHistoryEntry(scan, pendingHistoryCaptureRef.current)
-          )
-        );
-      }
-    });
+  const {
+    scanResult,
+    displayNodes,
+    isScanning,
+    activeNodeId,
+    completedNodeIds,
+    scanProgress,
+    runScan,
+    loadScan
+  } = useDiagnosticScan({
+    adapter,
+    initialScan: initialAppState.initialScan,
+    onScanComplete: (scan) => {
+      setSelectedNodeId(scan.diagnosis.primaryFailedNodeId ?? scan.nodes[0]?.id);
+      setScanHistory((currentHistory) =>
+        upsertScanHistoryEntry(
+          currentHistory,
+          createHistoryEntry(scan, pendingHistoryCaptureRef.current)
+        )
+      );
+    }
+  });
 
   useEffect(() => {
     if (scanHistory.length) {
@@ -134,6 +153,25 @@ export default function App() {
       setSelectedNodeId(activeNodeId);
     }
   }, [activeNodeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void adapter
+      .getEnvironmentInfo()
+      .then((environment) => {
+        if (!cancelled) {
+          setEnvironmentInfo(environment);
+        }
+      })
+      .catch((error) => {
+        console.warn("Failed to load runtime environment info", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adapter]);
 
   useEffect(() => {
     if (showRawOutput) {
@@ -193,7 +231,11 @@ export default function App() {
       )
     );
     try {
-      const result = await adapter.runFix(fix, confirmation);
+      const result = await withTimeout(
+        adapter.runFix(fix, confirmation),
+        FIX_EXECUTION_TIMEOUT_MS,
+        "The repair command took too long and was stopped before Aegis could verify it."
+      );
       setFixResult(result);
       setPendingFix(null);
 
@@ -229,6 +271,22 @@ export default function App() {
       } else {
         setRepairVerification(buildRepairBlockedVerification(beforeScan, result));
       }
+    } catch (error) {
+      const message =
+        error instanceof TimeoutError
+          ? error.message
+          : "Aegis could not complete the requested repair action.";
+      const blockedResult: FixExecutionResult = {
+        fixId: fix.id,
+        status: "blocked",
+        title: fix.title,
+        message,
+        requiresAdmin: fix.requiresAdmin
+      };
+
+      setFixResult(blockedResult);
+      setPendingFix(null);
+      setRepairVerification(buildRepairBlockedVerification(beforeScan, blockedResult));
     } finally {
       setFixBusy(false);
       setIsVerifyingFix(false);
@@ -241,12 +299,14 @@ export default function App() {
 
   return (
     <AppShell
+      appVersion={environmentInfo.appVersion}
       scan={scanResult}
       mode={mode}
       theme={theme}
       scenarioId={scenarioId}
       isScanning={isScanning}
       demoMode={demoMode}
+      footerMetrics={footerMetrics}
       onModeChange={setMode}
       onThemeChange={setTheme}
       onScenarioChange={handleScenarioChange}
@@ -254,12 +314,14 @@ export default function App() {
       onExportReport={() => setReportOpen(true)}
       onOpenSettings={() => setSettingsOpen(true)}
     >
-      <div className="grid min-w-0 gap-3 lg:h-full lg:min-h-0 lg:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-3 lg:min-h-full lg:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
         <StatusOverview
           diagnosis={scanResult.diagnosis}
           completedChecks={totalChecks}
           lastRunAt={scanResult.createdAt}
           isScanning={isScanning}
+          scanProgress={scanProgress}
+          totalTimelineNodes={displayNodes.length}
           onRunScan={handleRunScan}
           onViewReport={() => setReportOpen(true)}
         />
@@ -268,6 +330,8 @@ export default function App() {
           nodes={displayNodes}
           selectedNodeId={selectedNode?.id}
           activeNodeId={activeNodeId}
+          completedNodeIds={completedNodeIds}
+          scanProgress={scanProgress}
           onSelectNode={setSelectedNodeId}
           isScanning={isScanning}
         />
@@ -294,10 +358,10 @@ export default function App() {
         </div>
 
         {selectedNode ? (
-          <div className="grid min-w-0 gap-3 lg:min-h-0 lg:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
+          <div className="grid min-w-0 gap-3 overflow-hidden lg:min-h-0 lg:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
             <DetailsPanel node={selectedNode} mode={mode} onRunFix={setPendingFix} />
 
-            <div className="grid min-w-0 gap-3 content-start">
+            <div className="grid min-w-0 gap-3 content-start lg:min-h-0 lg:grid-rows-[auto_minmax(0,1fr)]">
               <RepairVerificationPanel
                 verification={repairVerification}
                 fixResult={fixResult}

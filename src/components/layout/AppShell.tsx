@@ -25,14 +25,30 @@ import { ModeToggle } from "@/components/settings/ModeToggle";
 import { ScenarioSwitcher } from "@/components/settings/ScenarioSwitcher";
 import { cn } from "@/utils/cn";
 
+type FooterMetrics = {
+  source: "system" | "browser";
+  collectedAt: string | null;
+  uptimeSeconds: number | null;
+  cpuUsagePercent: number | null;
+  memoryUsedBytes: number | null;
+  memoryTotalBytes: number | null;
+  memoryUsagePercent: number | null;
+  downloadBitsPerSecond: number | null;
+  uploadBitsPerSecond: number | null;
+  cpuHistory: Array<number | null>;
+  memoryHistory: Array<number | null>;
+};
+
 type AppShellProps = {
   children: ReactNode;
+  appVersion: string;
   scan: ScanResult;
   mode: AppMode;
   theme: ThemeMode;
   scenarioId: MockScenarioId;
   isScanning: boolean;
   demoMode: boolean;
+  footerMetrics: FooterMetrics;
   onModeChange: (mode: AppMode) => void;
   onThemeChange: (theme: ThemeMode) => void;
   onScenarioChange: (scenario: MockScenarioId) => void;
@@ -41,9 +57,71 @@ type AppShellProps = {
   onOpenSettings: () => void;
 };
 
-const FOOTER_CPU_SPARK = "2,11 12,11 20,10 28,11 36,11 45,10 52,11 60,4 68,4 76,11 88,11 98,10";
-const FOOTER_MEMORY_SPARK =
-  "2,11 14,11 24,11 32,7 40,11 50,11 60,10 68,4 76,4 84,11 92,11 98,10";
+function formatUptime(seconds: number | null) {
+  if (seconds === null || !Number.isFinite(seconds)) {
+    return "--";
+  }
+
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m`;
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${minutes}m`;
+}
+
+function formatPercent(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return "--";
+  }
+
+  return `${Math.round(value)}%`;
+}
+
+function formatBandwidth(bitsPerSecond: number | null) {
+  if (bitsPerSecond === null || !Number.isFinite(bitsPerSecond)) {
+    return "--";
+  }
+
+  if (bitsPerSecond >= 1_000_000) {
+    return `${(bitsPerSecond / 1_000_000).toFixed(1)} Mbps`;
+  }
+
+  if (bitsPerSecond >= 1_000) {
+    return `${(bitsPerSecond / 1_000).toFixed(1)} Kbps`;
+  }
+
+  return `${Math.round(bitsPerSecond)} bps`;
+}
+
+function buildSparklinePoints(values: Array<number | null>) {
+  const fallbackY = 11;
+  const resolvedValues = values.map((value) => (value === null ? null : Math.max(0, value)));
+  const maxValue =
+    resolvedValues.reduce<number>((currentMax, value) => {
+      if (value === null) {
+        return currentMax;
+      }
+
+      return Math.max(currentMax, value);
+    }, 0) || 100;
+
+  return resolvedValues
+    .map((value, index) => {
+      const x = 2 + (96 / Math.max(values.length - 1, 1)) * index;
+      const ratio = value === null ? null : Math.min(value / maxValue, 1);
+      const y = ratio === null ? fallbackY : 11 - ratio * 7;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
 
 function FooterSparkline({
   points,
@@ -97,12 +175,14 @@ function FooterSegment({
 
 export function AppShell({
   children,
+  appVersion,
   scan,
   mode,
   theme,
   scenarioId,
   isScanning,
   demoMode,
+  footerMetrics,
   onModeChange,
   onThemeChange,
   onScenarioChange,
@@ -110,6 +190,13 @@ export function AppShell({
   onExportReport,
   onOpenSettings
 }: AppShellProps) {
+  const cpuSparkPoints = buildSparklinePoints(footerMetrics.cpuHistory);
+  const memorySparkPoints = buildSparklinePoints(footerMetrics.memoryHistory);
+  const footerStatusLabel =
+    footerMetrics.source === "system" ? "Live metrics" : "Browser fallback";
+  const footerStatusDotClassName =
+    footerMetrics.source === "system" ? "bg-[#54d786]" : "bg-[#f2b84b]";
+
   const navItems = [
     { label: "Overview", icon: Home },
     { label: "Diagnosis", icon: Stethoscope, active: true },
@@ -124,11 +211,15 @@ export function AppShell({
   ];
 
   return (
-    <div className={cn("min-h-dvh overflow-x-hidden bg-[#08111b] text-slate-100 antialiased")}>
+    <div
+      className={cn(
+        "h-dvh max-h-dvh overflow-hidden bg-[#08111b] text-slate-100 antialiased"
+      )}
+    >
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(31,110,255,0.12),transparent_24%),radial-gradient(circle_at_70%_0%,rgba(72,132,255,0.07),transparent_20%),linear-gradient(180deg,#09111b_0%,#0b1220_100%)]" />
 
-      <div className="relative mx-auto min-h-dvh max-w-[1680px] lg:h-dvh lg:overflow-hidden">
-        <div className="grid min-h-dvh lg:h-dvh lg:grid-cols-[248px_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)_auto]">
+      <div className="relative mx-auto h-full max-w-[1680px] overflow-hidden">
+        <div className="grid h-full lg:grid-cols-[248px_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)_auto]">
           <aside className="min-h-0 border-b border-[color:var(--aegis-line)] bg-[#09111c]/92 px-3 py-4 lg:row-span-2 lg:flex lg:flex-col lg:overflow-hidden lg:border-b-0 lg:border-r">
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="flex items-center gap-4 px-3 pb-5">
@@ -286,55 +377,61 @@ export function AppShell({
             </div>
           </header>
 
-          <main className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-4 lg:overflow-hidden lg:px-6 lg:py-3">
+          <main className="hide-scrollbar min-h-0 min-w-0 overscroll-contain overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-4 lg:px-6 lg:py-3">
             {children}
           </main>
 
-          <footer className="min-w-0 overflow-hidden border-t border-[color:var(--aegis-line)] bg-[linear-gradient(180deg,rgba(12,18,29,0.98)_0%,rgba(8,15,25,0.98)_100%)] px-4 sm:px-6 lg:col-span-2">
+          <footer className="min-w-0 shrink-0 overflow-hidden border-t border-[color:var(--aegis-line)] bg-[linear-gradient(180deg,rgba(12,18,29,0.98)_0%,rgba(8,15,25,0.98)_100%)] px-4 sm:px-6 lg:col-span-2">
             <div className="hide-scrollbar flex min-h-[54px] items-center overflow-x-auto text-[0.89rem] text-slate-300 2xl:grid 2xl:grid-cols-[1.35fr_1.15fr_1fr_1fr_1.1fr_1.7fr_1.15fr] 2xl:overflow-visible">
               <FooterSegment className="min-w-[164px] 2xl:min-w-0">
                 <span className="font-normal tracking-[0.01em] text-slate-300">Aegis Network Doctor</span>
               </FooterSegment>
 
               <FooterSegment className="min-w-[150px] 2xl:min-w-0">
-                <span className="text-slate-400">Version {scan.environment.appVersion}</span>
+                <span className="text-slate-400">Version {appVersion}</span>
               </FooterSegment>
 
               <FooterSegment label="Uptime" className="min-w-[148px] 2xl:min-w-0">
-                <span className="text-slate-300">2d 14h 22m</span>
+                <span className="text-slate-300">{formatUptime(footerMetrics.uptimeSeconds)}</span>
               </FooterSegment>
 
               <FooterSegment label="CPU" className="min-w-[142px] 2xl:min-w-0">
-                <span className="text-slate-200">8%</span>
+                <span className="text-slate-200">
+                  {formatPercent(footerMetrics.cpuUsagePercent)}
+                </span>
                 <FooterSparkline
-                  points={FOOTER_CPU_SPARK}
+                  points={cpuSparkPoints}
                   strokeClassName="text-slate-500/90"
                 />
               </FooterSegment>
 
               <FooterSegment label="Memory" className="min-w-[160px] 2xl:min-w-0">
-                <span className="text-slate-200">46%</span>
+                <span className="text-slate-200">
+                  {formatPercent(footerMetrics.memoryUsagePercent)}
+                </span>
                 <FooterSparkline
-                  points={FOOTER_MEMORY_SPARK}
+                  points={memorySparkPoints}
                   strokeClassName="text-slate-500/90"
                 />
               </FooterSegment>
 
               <FooterSegment label="Network" className="min-w-[224px] 2xl:min-w-0">
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  <span className="text-slate-300">88.3 Kbps</span>
+                  <span className="text-slate-300">
+                    {formatBandwidth(footerMetrics.downloadBitsPerSecond)}
+                  </span>
                   <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.7} />
                 </span>
                 <span className="inline-flex items-center gap-1 text-slate-400">
-                  12.4 Kbps
+                  {formatBandwidth(footerMetrics.uploadBitsPerSecond)}
                   <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.7} />
                 </span>
               </FooterSegment>
 
               <FooterSegment className="min-w-[146px] justify-end 2xl:min-w-0">
                 <span className="text-[0.9rem] font-normal tracking-[0.01em] text-slate-500">Status</span>
-                <span className="h-2.5 w-2.5 rounded-full bg-[#54d786]" />
-                <span className="text-slate-300">Up to date</span>
+                <span className={cn("h-2.5 w-2.5 rounded-full", footerStatusDotClassName)} />
+                <span className="text-slate-300">{footerStatusLabel}</span>
               </FooterSegment>
             </div>
           </footer>

@@ -26,7 +26,7 @@ export function DetailsPanel({ node, mode, onRunFix }: DetailsPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-panel backdrop-blur-2xl">
+    <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.045] p-5 shadow-panel backdrop-blur-2xl">
       <div className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
@@ -56,7 +56,7 @@ export function DetailsPanel({ node, mode, onRunFix }: DetailsPanelProps) {
         </div>
       </div>
 
-      <div className="mt-5">
+      <div className="hide-scrollbar mt-5 min-h-0 flex-1 overflow-auto pr-1">
         {activeTab === "overview" ? (
           <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
             <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-5">

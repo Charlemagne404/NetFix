@@ -1,6 +1,6 @@
 import { AlertCircle, ChevronDown, Play, Wifi } from "lucide-react";
 import { motion } from "framer-motion";
-import type { OverallDiagnosis } from "@/core/types";
+import type { OverallDiagnosis, ScanProgress } from "@/core/types";
 import { cn } from "@/utils/cn";
 import { severityLabels } from "@/utils/status";
 
@@ -9,6 +9,8 @@ type StatusOverviewProps = {
   completedChecks: number;
   lastRunAt: string;
   isScanning: boolean;
+  scanProgress?: ScanProgress;
+  totalTimelineNodes: number;
   onRunScan: () => void;
   onViewReport: () => void;
 };
@@ -18,6 +20,8 @@ export function StatusOverview({
   completedChecks,
   lastRunAt,
   isScanning,
+  scanProgress,
+  totalTimelineNodes,
   onRunScan
 }: StatusOverviewProps) {
   const isProblemState = !["info", "low"].includes(diagnosis.severity);
@@ -34,6 +38,13 @@ export function StatusOverview({
     minute: "2-digit"
   });
   const durationSeconds = Math.max(8.2, completedChecks * 0.68).toFixed(1);
+  const stageNumber =
+    isScanning && typeof scanProgress?.nodeIndex === "number"
+      ? Math.min(scanProgress.nodeIndex + 1, totalTimelineNodes)
+      : undefined;
+  const progressLabel = stageNumber
+    ? `Stage ${stageNumber} of ${totalTimelineNodes}`
+    : `Preparing ${totalTimelineNodes}-stage timeline`;
 
   return (
     <motion.section
@@ -72,7 +83,8 @@ export function StatusOverview({
             </h2>
             <p className="mt-1.5 max-w-[34rem] text-[0.97rem] leading-7 text-slate-300">
               {isScanning
-                ? "Aegis is stepping through the connection chain so the recommendation stays tied to the actual break point."
+                ? scanProgress?.message ??
+                  "Aegis is stepping through the connection chain live so the timeline follows the real scan."
                 : diagnosis.summary}
             </p>
           </div>
@@ -108,11 +120,23 @@ export function StatusOverview({
         </div>
 
         <div className="border-[color:var(--aegis-line)] xl:border-l xl:pl-8">
-          <p className="text-[0.96rem] text-slate-400">Diagnostics completed</p>
+          <p className="text-[0.96rem] text-slate-400">
+            {isScanning ? "Live progress" : "Diagnostics completed"}
+          </p>
           <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.98rem] text-slate-200">
-            <span>{completedChecks} tests run</span>
-            <span className="text-slate-500">|</span>
-            <span>Duration: 00:{durationSeconds}</span>
+            {isScanning ? (
+              <>
+                <span>{progressLabel}</span>
+                <span className="text-slate-500">|</span>
+                <span>{scanProgress?.nodeLabel ?? "Loading scan stages"}</span>
+              </>
+            ) : (
+              <>
+                <span>{completedChecks} tests run</span>
+                <span className="text-slate-500">|</span>
+                <span>Duration: 00:{durationSeconds}</span>
+              </>
+            )}
           </div>
         </div>
 

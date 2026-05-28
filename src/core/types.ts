@@ -76,6 +76,7 @@ export type DiagnosticNode = {
   rawOutput?: string;
   startedAt?: string;
   completedAt?: string;
+  progressState?: "queued" | "running" | "checked";
 };
 
 export type OverallDiagnosis = {
@@ -116,6 +117,27 @@ export type FixExecutionResult = {
 export type EnvironmentInfo = ScanResult["environment"] & {
   isWindows: boolean;
   isTauri: boolean;
+};
+
+export type SystemMetrics = {
+  collectedAt: string;
+  source: "system" | "browser";
+  uptimeSeconds: number | null;
+  cpuUsagePercent: number | null;
+  memoryUsedBytes: number | null;
+  memoryTotalBytes: number | null;
+  networkReceivedBytes: number | null;
+  networkTransmittedBytes: number | null;
+};
+
+export type ScanProgress = {
+  runId: string;
+  kind: "scan-started" | "node-started" | "scan-finished";
+  nodeId?: string;
+  nodeLabel?: string;
+  nodeIndex?: number;
+  totalNodes: number;
+  message: string;
 };
 
 export type RepairNodeTransition = {

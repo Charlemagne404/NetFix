@@ -1,11 +1,20 @@
 use crate::diagnostics::{
     environment_info, export_local_report, generate_wlan_report_impl, run_allowlisted_fix,
-    run_windows_scan, EnvironmentInfo, FixConfirmation, FixExecutionResult, ScanResult,
+    run_windows_scan, system_metrics, EnvironmentInfo, FixConfirmation, FixExecutionResult,
+    ScanProgressEvent, ScanResult, SystemMetrics,
 };
+use tauri::{AppHandle, Emitter};
 
 #[tauri::command]
-pub async fn run_scan(scenario_id: Option<String>) -> Result<ScanResult, String> {
-    run_windows_scan(scenario_id).map_err(|error| error.to_string())
+pub async fn run_scan(
+    app: AppHandle,
+    scenario_id: Option<String>,
+    run_id: String,
+) -> Result<ScanResult, String> {
+    run_windows_scan(scenario_id, &run_id, |progress: ScanProgressEvent| {
+        let _ = app.emit("aegis://scan-progress", progress);
+    })
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -33,4 +42,9 @@ pub async fn generate_wlan_report() -> Result<FixExecutionResult, String> {
 #[tauri::command]
 pub async fn get_environment_info() -> Result<EnvironmentInfo, String> {
     Ok(environment_info())
+}
+
+#[tauri::command]
+pub async fn get_system_metrics() -> Result<SystemMetrics, String> {
+    Ok(system_metrics())
 }

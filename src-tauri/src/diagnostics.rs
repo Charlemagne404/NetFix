@@ -5,6 +5,7 @@ use std::fs;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
+use sysinfo::{Networks, System, MINIMUM_CPU_UPDATE_INTERVAL};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -111,6 +112,19 @@ pub struct EnvironmentInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SystemMetrics {
+    pub collected_at: String,
+    pub source: String,
+    pub uptime_seconds: Option<u64>,
+    pub cpu_usage_percent: Option<f32>,
+    pub memory_used_bytes: Option<u64>,
+    pub memory_total_bytes: Option<u64>,
+    pub network_received_bytes: Option<u64>,
+    pub network_transmitted_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ScanResult {
     pub id: String,
     pub created_at: String,
@@ -119,6 +133,18 @@ pub struct ScanResult {
     pub diagnosis: OverallDiagnosis,
     pub nodes: Vec<DiagnosticNode>,
     pub environment: Environment,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanProgressEvent {
+    pub run_id: String,
+    pub kind: String,
+    pub node_id: Option<String>,
+    pub node_label: Option<String>,
+    pub node_index: Option<usize>,
+    pub total_nodes: usize,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1026,6 +1052,109 @@ fn powershell_single_quoted(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
 
+const TOTAL_TIMELINE_NODES: usize = 10;
+
+fn scan_progress_event(
+    run_id: &str,
+    kind: &str,
+    node_id: Option<&str>,
+    node_index: Option<usize>,
+    message: &str,
+) -> ScanProgressEvent {
+    ScanProgressEvent {
+        run_id: run_id.to_string(),
+        kind: kind.to_string(),
+        node_id: node_id.map(str::to_string),
+        node_label: node_id.map(|id| match id {
+            "device" => "Device",
+            "adapter" => "Adapter",
+            "wifi" => "Wi-Fi",
+            "profile" => "Profile",
+            "ip" => "IP Address",
+            "gateway" => "Gateway",
+            "internet" => "Internet",
+            "dns" => "DNS",
+            "windows" => "Windows Status",
+            "apps" => "Apps",
+            _ => id,
+        }
+        .to_string()),
+        node_index,
+        total_nodes: TOTAL_TIMELINE_NODES,
+        message: message.to_string(),
+    }
+}
+
+fn emit_scan_started<F>(emit_progress: &mut F, run_id: &str)
+where
+    F: FnMut(ScanProgressEvent),
+{
+    emit_progress(scan_progress_event(
+        run_id,
+        "scan-started",
+        None,
+        None,
+        "Preparing the diagnostic timeline...",
+    ));
+}
+
+fn emit_node_started<F>(emit_progress: &mut F, run_id: &str, node_id: &str, node_index: usize, message: &str)
+where
+    F: FnMut(ScanProgressEvent),
+{
+    emit_progress(scan_progress_event(
+        run_id,
+        "node-started",
+        Some(node_id),
+        Some(node_index),
+        message,
+    ));
+}
+
+fn emit_scan_finished<F>(emit_progress: &mut F, run_id: &str)
+where
+    F: FnMut(ScanProgressEvent),
+{
+    emit_progress(scan_progress_event(
+        run_id,
+        "scan-finished",
+        None,
+        None,
+        "Finalizing the diagnosis...",
+    ));
+}
+
+pub fn ensure_elevated_launch() {
+    if !cfg!(target_os = "windows") || current_process_is_admin() {
+        return;
+    }
+
+    let exe_path = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(_) => return,
+    };
+    let exe_display = powershell_single_quoted(exe_path.to_string_lossy().as_ref());
+    let args = std::env::args()
+        .skip(1)
+        .map(|arg| powershell_single_quoted(&arg))
+        .collect::<Vec<_>>();
+    let args_expression = if args.is_empty() {
+        "@()".to_string()
+    } else {
+        format!("@({})", args.join(","))
+    };
+    let relaunch_script = format!(
+        "$argList = {args_expression}; try {{ Start-Process -FilePath {exe_display} -ArgumentList $argList -Verb RunAs | Out-Null; exit 0 }} catch {{ exit 1 }}"
+    );
+
+    if powershell(&relaunch_script)
+        .map(|output| output.success)
+        .unwrap_or(false)
+    {
+        std::process::exit(0);
+    }
+}
+
 fn join_non_empty(values: &[String], fallback: &str) -> String {
     let filtered: Vec<&str> = values
         .iter()
@@ -1363,15 +1492,38 @@ fn simple_mock_scan() -> ScanResult {
     }
 }
 
-pub fn run_windows_scan(_scenario_id: Option<String>) -> Result<ScanResult, Box<dyn Error>> {
+pub fn run_windows_scan<F>(
+    _scenario_id: Option<String>,
+    run_id: &str,
+    mut emit_progress: F,
+) -> Result<ScanResult, Box<dyn Error>>
+where
+    F: FnMut(ScanProgressEvent),
+{
+    emit_scan_started(&mut emit_progress, run_id);
+
     if !cfg!(target_os = "windows") {
         return Ok(simple_mock_scan());
     }
 
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "device",
+        0,
+        "Inspecting Windows access and the local network stack...",
+    );
     let is_admin = current_process_is_admin();
     let os_out = powershell_capture(
         "Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,BuildNumber,LastBootUpTime | ConvertTo-Json -Depth 4 -Compress",
         "os",
+    );
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "adapter",
+        1,
+        "Checking which network adapter is carrying the current route...",
     );
     let adapter_out = powershell_capture(
         "Get-NetAdapter -IncludeHidden | Select-Object Name,InterfaceDescription,Status,MacAddress,InterfaceIndex,HardwareInterface,NdisPhysicalMedium,LinkSpeed | ConvertTo-Json -Depth 4 -Compress",
@@ -1381,8 +1533,29 @@ pub fn run_windows_scan(_scenario_id: Option<String>) -> Result<ScanResult, Box<
         "Get-Service WlanSvc,Dhcp,Dnscache,NlaSvc,Nsi | Select-Object Name,Status,StartType | ConvertTo-Json -Depth 4 -Compress",
         "services",
     );
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "wifi",
+        2,
+        "Reading wireless service health and the live radio state...",
+    );
     let wifi_out = powershell_capture("netsh wlan show interfaces", "wifi interfaces");
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "profile",
+        3,
+        "Matching the current Wi-Fi connection to its saved profile...",
+    );
     let wlan_profiles_out = powershell_capture("netsh wlan show profiles", "wifi profiles");
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "ip",
+        4,
+        "Inspecting IPv4, DHCP, and DNS server configuration...",
+    );
     let ip_config_out = powershell_capture(
         "Get-NetIPConfiguration | Select-Object InterfaceAlias,InterfaceIndex,IPv4Address,IPv4DefaultGateway,DNSServer,NetProfile | ConvertTo-Json -Depth 6 -Compress",
         "ip config",
@@ -1390,6 +1563,13 @@ pub fn run_windows_scan(_scenario_id: Option<String>) -> Result<ScanResult, Box<
     let ip_interface_out = powershell_capture(
         "Get-NetIPInterface -AddressFamily IPv4 | Select-Object InterfaceAlias,InterfaceIndex,Dhcp,ConnectionState,InterfaceMetric | ConvertTo-Json -Depth 4 -Compress",
         "ip interface",
+    );
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "gateway",
+        5,
+        "Testing the local gateway path and default route...",
     );
     let route_out = powershell_capture(
         "Get-NetRoute -AddressFamily IPv4 | Where-Object { $_.DestinationPrefix -eq '0.0.0.0/0' } | Sort-Object RouteMetric | Select-Object InterfaceAlias,InterfaceIndex,DestinationPrefix,NextHop,RouteMetric,State | ConvertTo-Json -Depth 4 -Compress",
@@ -1404,6 +1584,13 @@ pub fn run_windows_scan(_scenario_id: Option<String>) -> Result<ScanResult, Box<
         "Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings' | Select-Object ProxyEnable,ProxyServer,AutoConfigURL,AutoDetect | ConvertTo-Json -Depth 3 -Compress",
         "user proxy",
     );
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "internet",
+        6,
+        "Probing public internet reachability across multiple endpoints...",
+    );
     let internet_primary_out = powershell_capture(
         "Test-NetConnection 1.1.1.1 -Port 443 -InformationLevel Detailed | Select-Object ComputerName,RemoteAddress,RemotePort,PingSucceeded,TcpTestSucceeded,InterfaceAlias,SourceAddress | ConvertTo-Json -Depth 4 -Compress",
         "internet primary",
@@ -1416,6 +1603,13 @@ pub fn run_windows_scan(_scenario_id: Option<String>) -> Result<ScanResult, Box<
         "Test-NetConnection 9.9.9.9 -Port 443 -InformationLevel Detailed | Select-Object ComputerName,RemoteAddress,RemotePort,PingSucceeded,TcpTestSucceeded,InterfaceAlias,SourceAddress | ConvertTo-Json -Depth 4 -Compress",
         "internet tertiary",
     );
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "dns",
+        7,
+        "Resolving hostnames through the local DNS path and a public comparison...",
+    );
     let dns_out = powershell_capture(
         "try { Resolve-DnsName example.com,openai.com -Type A -ErrorAction Stop | Select-Object -First 6 Name,Type,IPAddress,Section | ConvertTo-Json -Depth 4 -Compress } catch { $_ | Out-String; exit 1 }",
         "dns local",
@@ -1423,6 +1617,13 @@ pub fn run_windows_scan(_scenario_id: Option<String>) -> Result<ScanResult, Box<
     let dns_public_out = powershell_capture(
         "try { Resolve-DnsName example.com,openai.com -Server 1.1.1.1 -Type A -ErrorAction Stop | Select-Object -First 6 Name,Type,IPAddress,Section | ConvertTo-Json -Depth 4 -Compress } catch { $_ | Out-String; exit 1 }",
         "dns public",
+    );
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "windows",
+        8,
+        "Checking Windows connectivity state, proxy settings, and portal signals...",
     );
     let http_probe_out = powershell_capture(
         r#"try {
@@ -1454,6 +1655,13 @@ pub fn run_windows_scan(_scenario_id: Option<String>) -> Result<ScanResult, Box<
             } | ConvertTo-Json -Depth 4 -Compress
         }"#,
         "http probe",
+    );
+    emit_node_started(
+        &mut emit_progress,
+        run_id,
+        "apps",
+        9,
+        "Testing whether application-level HTTPS endpoints still respond cleanly...",
     );
     let apps_primary_out = powershell_capture(
         "Test-NetConnection www.microsoft.com -Port 443 -InformationLevel Detailed | Select-Object ComputerName,RemoteAddress,RemotePort,PingSucceeded,TcpTestSucceeded,InterfaceAlias,SourceAddress | ConvertTo-Json -Depth 4 -Compress",
@@ -2897,6 +3105,8 @@ pub fn run_windows_scan(_scenario_id: Option<String>) -> Result<ScanResult, Box<
             )
         };
 
+    emit_scan_finished(&mut emit_progress, run_id);
+
     Ok(ScanResult {
         id: now_id(),
         created_at: now_iso(),
@@ -3245,9 +3455,48 @@ pub fn environment_info() -> EnvironmentInfo {
     EnvironmentInfo {
         os: std::env::consts::OS.to_string(),
         hostname: hostname(),
-        app_version: "0.1.0".to_string(),
+        app_version: env!("CARGO_PKG_VERSION").to_string(),
         is_admin: Some(current_process_is_admin()),
         is_windows: cfg!(target_os = "windows"),
         is_tauri: true,
+    }
+}
+
+fn is_loopback_interface(name: &str) -> bool {
+    let normalized_name = name.trim().to_ascii_lowercase();
+    normalized_name == "lo"
+        || normalized_name == "lo0"
+        || normalized_name.contains("loopback")
+}
+
+pub fn system_metrics() -> SystemMetrics {
+    let mut system = System::new_all();
+    system.refresh_memory();
+    system.refresh_cpu_usage();
+    thread::sleep(MINIMUM_CPU_UPDATE_INTERVAL);
+    system.refresh_cpu_usage();
+
+    let mut networks = Networks::new_with_refreshed_list();
+    networks.refresh(true);
+
+    let (network_received_bytes, network_transmitted_bytes) = networks
+        .iter()
+        .filter(|(name, _)| !is_loopback_interface(name))
+        .fold((0_u64, 0_u64), |(received, transmitted), (_, data)| {
+            (
+                received.saturating_add(data.total_received()),
+                transmitted.saturating_add(data.total_transmitted()),
+            )
+        });
+
+    SystemMetrics {
+        collected_at: now_iso(),
+        source: "system".to_string(),
+        uptime_seconds: Some(System::uptime()),
+        cpu_usage_percent: Some(system.global_cpu_usage()),
+        memory_used_bytes: Some(system.used_memory()),
+        memory_total_bytes: Some(system.total_memory()),
+        network_received_bytes: Some(network_received_bytes),
+        network_transmitted_bytes: Some(network_transmitted_bytes),
     }
 }

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import type { DiagnosticNode } from "@/core/types";
+import type { DiagnosticNode, ScanProgress } from "@/core/types";
 import { TimelineNode } from "./TimelineNode";
 import { cn } from "@/utils/cn";
 
@@ -7,6 +7,8 @@ type DiagnosticTimelineProps = {
   nodes: DiagnosticNode[];
   selectedNodeId?: string;
   activeNodeId?: string;
+  completedNodeIds: string[];
+  scanProgress?: ScanProgress;
   onSelectNode: (nodeId: string) => void;
   isScanning: boolean;
 };
@@ -44,6 +46,8 @@ export function DiagnosticTimeline({
   nodes,
   selectedNodeId,
   activeNodeId,
+  completedNodeIds,
+  scanProgress,
   onSelectNode,
   isScanning
 }: DiagnosticTimelineProps) {
@@ -51,6 +55,7 @@ export function DiagnosticTimeline({
     ? nodes.findIndex((node) => node.id === activeNodeId)
     : -1;
   const primaryFailedIndex = nodes.findIndex((node) => node.status === "failed");
+  const completedNodeIdSet = new Set(completedNodeIds);
 
   return (
     <section className="app-panel min-w-0 rounded-[14px] px-4 py-4 sm:px-5 sm:py-5">
@@ -60,13 +65,22 @@ export function DiagnosticTimeline({
         <div className="relative min-w-[760px] xl:min-w-0">
           <div className="pointer-events-none absolute left-[5%] right-[5%] top-[4.72rem]">
             <div className="grid grid-cols-9 gap-0">
-              {nodes.slice(0, -1).map((node, index) => (
-                <motion.div
-                  key={`${node.id}-${nodes[index + 1]?.id}`}
-                  className={cn(
-                    "mx-0 h-[2px] origin-left rounded-full transition-[opacity] duration-300",
-                    connectorTone(node, nodes[index + 1], index, primaryFailedIndex)
-                  )}
+              {nodes.slice(0, -1).map((node, index) => {
+                const rightNode = nodes[index + 1];
+                const liveConnectorClass =
+                  isScanning &&
+                  (index < activeIndex ||
+                    (completedNodeIdSet.has(node.id) && completedNodeIdSet.has(rightNode?.id ?? "")))
+                    ? "bg-[linear-gradient(90deg,#31baf7_0%,#67e8f9_100%)] shadow-[0_0_12px_rgba(56,189,248,0.14)]"
+                    : connectorTone(node, rightNode, index, primaryFailedIndex);
+
+                return (
+                  <motion.div
+                    key={`${node.id}-${rightNode?.id}`}
+                    className={cn(
+                      "mx-0 h-[2px] origin-left rounded-full transition-[opacity] duration-300",
+                      liveConnectorClass
+                    )}
                   initial={{ scaleX: 0, opacity: 0 }}
                   animate={{
                     scaleX:
@@ -86,7 +100,8 @@ export function DiagnosticTimeline({
                   }}
                   transition={{ delay: index * 0.04, duration: 0.4, ease: "easeOut" }}
                 />
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -98,6 +113,7 @@ export function DiagnosticTimeline({
                 index={index}
                 selected={node.id === selectedNodeId}
                 active={node.id === activeNodeId}
+                liveComplete={completedNodeIdSet.has(node.id)}
                 isPrimaryFailure={primaryFailedIndex === index}
                 isDownstreamOfFailure={primaryFailedIndex >= 0 && index > primaryFailedIndex}
                 isScanning={isScanning}
@@ -111,7 +127,8 @@ export function DiagnosticTimeline({
       <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[13px] text-slate-400">
         <span className="text-slate-500">
           {isScanning
-            ? "Aegis is replaying the connection chain from device to apps."
+            ? scanProgress?.message ??
+              "Aegis is moving through the connection chain live as each stage responds."
             : "Select any stage to inspect the evidence behind it."}
         </span>
 

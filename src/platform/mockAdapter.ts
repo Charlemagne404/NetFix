@@ -1,14 +1,43 @@
 import { createMockScanResult } from "@/core/mockData";
+import { TIMELINE_DEFINITION } from "@/core/timelineDefinition";
 import { isAllowlistedFixId } from "@/core/fixRegistry";
 import { buildHtmlReport, buildJsonReport, downloadTextFile } from "@/core/reportExport";
+import packageInfo from "../../package.json";
 import type { PlatformAdapter } from "./platformAdapter";
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export const mockAdapter: PlatformAdapter = {
   kind: "mock",
-  async runScan(scenarioId) {
-    await wait(250);
+  async runScan({ scenarioId, runId, onProgress }) {
+    onProgress?.({
+      runId,
+      kind: "scan-started",
+      totalNodes: TIMELINE_DEFINITION.length,
+      message: "Preparing the diagnostic timeline..."
+    });
+
+    for (const [index, node] of TIMELINE_DEFINITION.entries()) {
+      onProgress?.({
+        runId,
+        kind: "node-started",
+        nodeId: node.id,
+        nodeLabel: node.label,
+        nodeIndex: index,
+        totalNodes: TIMELINE_DEFINITION.length,
+        message: `Checking ${node.label.toLowerCase()} in the live timeline...`
+      });
+      await wait(260);
+    }
+
+    await wait(120);
+    onProgress?.({
+      runId,
+      kind: "scan-finished",
+      totalNodes: TIMELINE_DEFINITION.length,
+      message: "Finalizing the diagnosis..."
+    });
+
     return createMockScanResult(scenarioId);
   },
   async runFix(fix, confirmation) {
@@ -46,10 +75,29 @@ export const mockAdapter: PlatformAdapter = {
     return {
       os: navigator.platform || "Unknown",
       hostname: "Local demo",
-      appVersion: "0.1.0",
+      appVersion: packageInfo.version,
       isAdmin: false,
       isWindows: navigator.userAgent.toLowerCase().includes("windows"),
       isTauri: false
+    };
+  },
+  async getSystemMetrics() {
+    const memory = "memory" in performance ? (performance as Performance & {
+      memory?: {
+        usedJSHeapSize: number;
+        jsHeapSizeLimit: number;
+      };
+    }).memory : undefined;
+
+    return {
+      collectedAt: new Date().toISOString(),
+      source: "browser",
+      uptimeSeconds: Math.round(performance.now() / 1000),
+      cpuUsagePercent: null,
+      memoryUsedBytes: memory?.usedJSHeapSize ?? null,
+      memoryTotalBytes: memory?.jsHeapSizeLimit ?? null,
+      networkReceivedBytes: null,
+      networkTransmittedBytes: null
     };
   }
 };

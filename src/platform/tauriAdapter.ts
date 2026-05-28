@@ -1,14 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { createMockScanResult } from "@/core/mockData";
 import { isAllowlistedFixId } from "@/core/fixRegistry";
 import { buildHtmlReport, buildJsonReport } from "@/core/reportExport";
+import packageInfo from "../../package.json";
 import type {
   EnvironmentInfo,
   FixAction,
   FixConfirmation,
   FixExecutionResult,
-  MockScenarioId,
-  ScanResult
+  ScanProgress,
+  ScanResult,
+  SystemMetrics
 } from "@/core/types";
 import type { PlatformAdapter } from "./platformAdapter";
 
@@ -26,10 +29,30 @@ function browserEnvironmentInfo(): EnvironmentInfo {
   return {
     os: navigator.platform || "Unknown",
     hostname: "Local browser",
-    appVersion: "0.1.0",
+    appVersion: packageInfo.version,
     isAdmin: false,
     isWindows: navigator.userAgent.toLowerCase().includes("windows"),
     isTauri: hasTauriRuntime()
+  };
+}
+
+function browserSystemMetrics(): SystemMetrics {
+  const memory = "memory" in performance ? (performance as Performance & {
+    memory?: {
+      usedJSHeapSize: number;
+      jsHeapSizeLimit: number;
+    };
+  }).memory : undefined;
+
+  return {
+    collectedAt: new Date().toISOString(),
+    source: "browser",
+    uptimeSeconds: Math.round(performance.now() / 1000),
+    cpuUsagePercent: null,
+    memoryUsedBytes: memory?.usedJSHeapSize ?? null,
+    memoryTotalBytes: memory?.jsHeapSizeLimit ?? null,
+    networkReceivedBytes: null,
+    networkTransmittedBytes: null
   };
 }
 
@@ -69,17 +92,30 @@ async function invokeWithMockFallback<T>(
 
 export const tauriAdapter: PlatformAdapter = {
   kind: "tauri",
-  async runScan(scenarioId?: MockScenarioId) {
+  async runScan({ scenarioId, runId, onProgress }) {
     const environment = await getResolvedEnvironmentInfo();
     if (!environment.isWindows) {
       return createMockScanResult(scenarioId);
     }
 
-    return invokeWithMockFallback<ScanResult>(
-      "run_scan",
-      { scenarioId },
-      () => createMockScanResult(scenarioId)
-    );
+    const unlisten =
+      onProgress && hasTauriRuntime()
+        ? await listen<ScanProgress>("aegis://scan-progress", (event) => {
+            if (event.payload.runId === runId) {
+              onProgress(event.payload);
+            }
+          })
+        : undefined;
+
+    try {
+      return await invokeWithMockFallback<ScanResult>(
+        "run_scan",
+        { scenarioId, runId },
+        () => createMockScanResult(scenarioId)
+      );
+    } finally {
+      await unlisten?.();
+    }
   },
   async runFix(fix: FixAction, confirmation?: FixConfirmation) {
     if (!isAllowlistedFixId(fix.id)) {
@@ -131,5 +167,12 @@ export const tauriAdapter: PlatformAdapter = {
   },
   async getEnvironmentInfo() {
     return getResolvedEnvironmentInfo();
+  },
+  async getSystemMetrics() {
+    return invokeWithMockFallback<SystemMetrics>(
+      "get_system_metrics",
+      {},
+      browserSystemMetrics
+    );
   }
 };
