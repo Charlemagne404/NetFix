@@ -5,6 +5,7 @@ import type {
   FixExecutionResult,
   MockScenarioId,
   ReportFormat,
+  RuntimeHealth,
   ScanProgress,
   ScanResult,
   SystemMetrics
@@ -25,5 +26,6 @@ export type PlatformAdapter = {
   ) => Promise<FixExecutionResult>;
   exportReport: (scan: ScanResult, format: ReportFormat) => Promise<string>;
   getEnvironmentInfo: () => Promise<EnvironmentInfo>;
+  getRuntimeHealth: () => Promise<RuntimeHealth>;
   getSystemMetrics: () => Promise<SystemMetrics>;
 };

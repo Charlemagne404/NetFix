@@ -49,6 +49,8 @@ type AppShellProps = {
   workspaceMode: WorkspaceMode;
   environmentInfo: EnvironmentInfo;
   footerMetrics: FooterMetrics;
+  scanActionEnabled: boolean;
+  scanActionReason?: string;
   onModeChange: (mode: AppMode) => void;
   onThemeChange: (theme: ThemeMode) => void;
   onRunScan: () => void;
@@ -182,6 +184,8 @@ export function AppShell({
   workspaceMode,
   environmentInfo,
   footerMetrics,
+  scanActionEnabled,
+  scanActionReason,
   onModeChange,
   onThemeChange,
   onRunScan,
@@ -247,6 +251,13 @@ export function AppShell({
       description: "Aegis is using preview data until the Windows desktop runtime is available.",
       accentClassName: "text-[#f2b84b]",
       dotClassName: "bg-[#f2b84b]"
+    },
+    degraded: {
+      badge: "Runtime issue",
+      title: scan.environment.hostname ?? "Windows desktop",
+      description: "Live diagnostics are paused until the native runtime is healthy again.",
+      accentClassName: "text-[#ff8a7e]",
+      dotClassName: "bg-[#ff6a5a]"
     },
     lab: {
       badge: "Diagnostic lab",
@@ -399,7 +410,8 @@ export function AppShell({
                 <button
                   type="button"
                   onClick={onRunScan}
-                  disabled={isScanning}
+                  disabled={isScanning || !scanActionEnabled}
+                  title={!scanActionEnabled ? scanActionReason : undefined}
                   className="app-outline-button inline-flex items-center gap-2 rounded-[10px] px-4 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Play className="h-4 w-4 text-[#4b8dff]" strokeWidth={1.8} />

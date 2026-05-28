@@ -11,6 +11,10 @@ type RepairPlanPanelProps = {
   diagnosis: OverallDiagnosis;
   fixResult: FixExecutionResult | null;
   isScanning: boolean;
+  fixesEnabled: boolean;
+  fixesDisabledReason?: string;
+  scanActionEnabled: boolean;
+  scanActionReason?: string;
   onOpenAdvancedOptions: () => void;
   onRunFix: (fix: FixAction) => void;
   onRunScan: () => void;
@@ -31,6 +35,10 @@ export function RepairPlanPanel({
   diagnosis,
   fixResult,
   isScanning,
+  fixesEnabled,
+  fixesDisabledReason,
+  scanActionEnabled,
+  scanActionReason,
   onOpenAdvancedOptions,
   onRunFix,
   onRunScan,
@@ -80,7 +88,9 @@ export function RepairPlanPanel({
                   <button
                     type="button"
                     onClick={() => onRunFix(fix)}
-                    className="app-outline-button inline-flex min-w-[9.5rem] items-center justify-center gap-2 rounded-[8px] border-[rgba(62,111,191,0.4)] bg-[rgba(13,31,56,0.58)] px-4 py-2.5 text-sm font-medium text-[#63a5ff]"
+                    disabled={!fixesEnabled}
+                    title={!fixesEnabled ? fixesDisabledReason : undefined}
+                    className="app-outline-button inline-flex min-w-[9.5rem] items-center justify-center gap-2 rounded-[8px] border-[rgba(62,111,191,0.4)] bg-[rgba(13,31,56,0.58)] px-4 py-2.5 text-sm font-medium text-[#63a5ff] disabled:cursor-not-allowed disabled:opacity-55"
                   >
                     {actionLabel(fix)}
                   </button>
@@ -98,6 +108,10 @@ export function RepairPlanPanel({
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[color:var(--aegis-line-soft)] px-1 pt-4">
+          {!fixesEnabled ? (
+            <p className="basis-full text-sm leading-6 text-amber-100/85">{fixesDisabledReason}</p>
+          ) : null}
+
           <button
             type="button"
             onClick={onOpenAdvancedOptions}
@@ -110,7 +124,8 @@ export function RepairPlanPanel({
           <button
             type="button"
             onClick={onRunScan}
-            disabled={isScanning}
+            disabled={isScanning || !scanActionEnabled}
+            title={!scanActionEnabled ? scanActionReason : undefined}
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RotateCcw className="h-4 w-4" />

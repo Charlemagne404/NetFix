@@ -1,6 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { createMockScanResult } from "@/core/mockData";
+import {
+  createDegradedRuntimeHealth,
+  createPreviewRuntimeHealth
+} from "@/core/runtimeHealth";
 import { isAllowlistedFixId } from "@/core/fixRegistry";
 import {
   buildHtmlReport,
@@ -18,20 +22,15 @@ import type {
   FixConfirmation,
   FixExecutionResult,
   ReportFormat,
+  RuntimeHealth,
   ScanProgress,
   ScanResult,
   SystemMetrics
 } from "@/core/types";
 import type { PlatformAdapter } from "./platformAdapter";
 
-declare global {
-  interface Window {
-    __TAURI_INTERNALS__?: unknown;
-  }
-}
-
 export function hasTauriRuntime(): boolean {
-  return typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__);
+  return typeof window !== "undefined" && isTauri();
 }
 
 type SerializedReportPayload = {
@@ -39,6 +38,17 @@ type SerializedReportPayload = {
   encoding: "utf8" | "base64";
   mimeType: string;
 };
+
+class TauriCommandError extends Error {
+  constructor(
+    readonly command: string,
+    message: string,
+    readonly cause?: unknown
+  ) {
+    super(message);
+    this.name = "TauriCommandError";
+  }
+}
 
 function browserEnvironmentInfo(): EnvironmentInfo {
   return {
@@ -80,28 +90,31 @@ async function getResolvedEnvironmentInfo(): Promise<EnvironmentInfo> {
 
   if (!environmentInfoPromise) {
     environmentInfoPromise = invoke<EnvironmentInfo>("get_environment_info", {}).catch((error) => {
-      console.warn("Tauri command get_environment_info failed; using browser fallback", error);
-      return browserEnvironmentInfo();
+      console.warn("Tauri command get_environment_info failed; using synthesized runtime info", error);
+      return {
+        ...browserEnvironmentInfo(),
+        isTauri: true
+      };
     });
   }
 
   return environmentInfoPromise;
 }
 
-async function invokeWithMockFallback<T>(
+async function invokeTauriCommand<T>(
   command: string,
-  payload: Record<string, unknown>,
-  fallback: () => T
+  payload: Record<string, unknown>
 ): Promise<T> {
-  if (!hasTauriRuntime()) {
-    return fallback();
-  }
-
   try {
     return await invoke<T>(command, payload);
   } catch (error) {
-    console.warn(`Tauri command ${command} failed; using mock fallback`, error);
-    return fallback();
+    const detail =
+      error instanceof Error ? error.message : `Unknown Tauri error while running ${command}.`;
+    throw new TauriCommandError(
+      command,
+      `Aegis could not complete the native '${command}' command. ${detail}`,
+      error
+    );
   }
 }
 
@@ -153,26 +166,25 @@ async function exportReportFallback(
 export const tauriAdapter: PlatformAdapter = {
   kind: "tauri",
   async runScan({ scenarioId, runId, onProgress }) {
+    if (!hasTauriRuntime()) {
+      return createMockScanResult(scenarioId);
+    }
+
     const environment = await getResolvedEnvironmentInfo();
     if (!environment.isWindows) {
       return createMockScanResult(scenarioId);
     }
 
-    const unlisten =
-      onProgress && hasTauriRuntime()
-        ? await listen<ScanProgress>("aegis-trace://scan-progress", (event) => {
-            if (event.payload.runId === runId) {
-              onProgress(event.payload);
-            }
-          })
-        : undefined;
+    const unlisten = onProgress
+      ? await listen<ScanProgress>("aegis-trace://scan-progress", (event) => {
+          if (event.payload.runId === runId) {
+            onProgress(event.payload);
+          }
+        })
+      : undefined;
 
     try {
-      return await invokeWithMockFallback<ScanResult>(
-        "run_scan",
-        { scenarioId, runId },
-        () => createMockScanResult(scenarioId)
-      );
+      return await invokeTauriCommand<ScanResult>("run_scan", { scenarioId, runId });
     } finally {
       await unlisten?.();
     }
@@ -188,7 +200,7 @@ export const tauriAdapter: PlatformAdapter = {
     }
 
     const environment = await getResolvedEnvironmentInfo();
-    if (!environment.isWindows) {
+    if (!hasTauriRuntime() || !environment.isWindows) {
       return {
         fixId: fix.id,
         status: "blocked",
@@ -198,17 +210,25 @@ export const tauriAdapter: PlatformAdapter = {
       };
     }
 
-    return invokeWithMockFallback<FixExecutionResult>(
-      "run_fix",
-      { fixId: fix.id, confirmation },
-      () => ({
+    try {
+      return await invokeTauriCommand<FixExecutionResult>("run_fix", {
+        fixId: fix.id,
+        confirmation
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Aegis could not start the requested fix in the native runtime.";
+
+      return {
         fixId: fix.id,
         status: "blocked",
-        title: "Fix unavailable",
-        message:
-          "Real fix execution is only available inside the Tauri Windows build. No command was executed."
-      })
-    );
+        title: "Fix execution failed",
+        message,
+        requiresAdmin: fix.requiresAdmin
+      };
+    }
   },
   async exportReport(scan, format) {
     const payload = await serializeReport(scan, format);
@@ -232,11 +252,31 @@ export const tauriAdapter: PlatformAdapter = {
   async getEnvironmentInfo() {
     return getResolvedEnvironmentInfo();
   },
+  async getRuntimeHealth() {
+    if (!hasTauriRuntime()) {
+      return createPreviewRuntimeHealth(browserEnvironmentInfo());
+    }
+
+    try {
+      return await invokeTauriCommand<RuntimeHealth>("get_runtime_health", {});
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? error.message
+          : "Aegis could not verify the native Windows runtime.";
+      return createDegradedRuntimeHealth(detail);
+    }
+  },
   async getSystemMetrics() {
-    return invokeWithMockFallback<SystemMetrics>(
-      "get_system_metrics",
-      {},
-      browserSystemMetrics
-    );
+    if (!hasTauriRuntime()) {
+      return browserSystemMetrics();
+    }
+
+    try {
+      return await invokeTauriCommand<SystemMetrics>("get_system_metrics", {});
+    } catch (error) {
+      console.warn("Tauri command get_system_metrics failed; using browser metrics", error);
+      return browserSystemMetrics();
+    }
   }
 };

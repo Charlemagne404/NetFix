@@ -1,4 +1,5 @@
 import { createMockScanResult } from "@/core/mockData";
+import { createPreviewRuntimeHealth } from "@/core/runtimeHealth";
 import { TIMELINE_DEFINITION } from "@/core/timelineDefinition";
 import { isAllowlistedFixId } from "@/core/fixRegistry";
 import {
@@ -93,6 +94,12 @@ export const mockAdapter: PlatformAdapter = {
       isWindows: navigator.userAgent.toLowerCase().includes("windows"),
       isTauri: false
     };
+  },
+  async getRuntimeHealth() {
+    return createPreviewRuntimeHealth({
+      isWindows: navigator.userAgent.toLowerCase().includes("windows"),
+      isTauri: false
+    });
   },
   async getSystemMetrics() {
     const memory = "memory" in performance ? (performance as Performance & {

@@ -10,6 +10,8 @@ import { TechnicianDetails } from "./TechnicianDetails";
 type DetailsPanelProps = {
   node: DiagnosticNode;
   mode: AppMode;
+  fixesEnabled: boolean;
+  fixesDisabledReason?: string;
   onRunFix: (fix: FixAction) => void;
 };
 
@@ -22,7 +24,13 @@ const tabs: { id: DetailTab; label: string }[] = [
   { id: "technician", label: "Technician Details" }
 ];
 
-export function DetailsPanel({ node, mode, onRunFix }: DetailsPanelProps) {
+export function DetailsPanel({
+  node,
+  mode,
+  fixesEnabled,
+  fixesDisabledReason,
+  onRunFix
+}: DetailsPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
 
   return (
@@ -105,7 +113,13 @@ export function DetailsPanel({ node, mode, onRunFix }: DetailsPanelProps) {
           <div className="space-y-3">
             {node.recommendedFixes.length ? (
               node.recommendedFixes.map((fix) => (
-                <FixActionCard key={fix.id} fix={fix} onRun={onRunFix} />
+                <FixActionCard
+                  key={fix.id}
+                  fix={fix}
+                  actionsEnabled={fixesEnabled}
+                  disabledReason={fixesDisabledReason}
+                  onRun={onRunFix}
+                />
               ))
             ) : (
               <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-5">

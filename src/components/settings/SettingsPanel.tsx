@@ -29,14 +29,18 @@ export function SettingsPanel({
 
   const runtimeLabel = demoMode
     ? "Diagnostic lab"
-    : environmentInfo.isWindows && environmentInfo.isTauri
+    : environmentInfo.isWindows && environmentInfo.isTauri && environmentInfo.isAdmin
       ? "Live Windows runtime"
-      : "Preview workspace";
+      : environmentInfo.isWindows && environmentInfo.isTauri
+        ? "Desktop runtime needs elevation"
+        : "Preview workspace";
   const runtimeDescription = demoMode
     ? "Replay known failure cases and simulated repairs without touching the current device."
-    : environmentInfo.isWindows && environmentInfo.isTauri
+    : environmentInfo.isWindows && environmentInfo.isTauri && environmentInfo.isAdmin
       ? "Allowlisted scans and repair actions are available in this desktop session."
-      : "Aegis stays explorable here with local preview data until the Windows Tauri runtime is available.";
+      : environmentInfo.isWindows && environmentInfo.isTauri
+        ? "The desktop runtime is present, but Aegis is not elevated. Live fixes may be blocked until Windows launches it with administrator access."
+        : "Aegis stays explorable here with local preview data until the Windows Tauri runtime is available.";
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/72 p-4 backdrop-blur-xl">

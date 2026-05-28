@@ -11,6 +11,8 @@ type StatusOverviewProps = {
   isScanning: boolean;
   scanProgress?: ScanProgress;
   totalTimelineNodes: number;
+  scanActionEnabled: boolean;
+  scanActionReason?: string;
   onRunScan: () => void;
   onViewReport: () => void;
 };
@@ -22,6 +24,8 @@ export function StatusOverview({
   isScanning,
   scanProgress,
   totalTimelineNodes,
+  scanActionEnabled,
+  scanActionReason,
   onRunScan
 }: StatusOverviewProps) {
   const isProblemState = !["info", "low"].includes(diagnosis.severity);
@@ -145,7 +149,8 @@ export function StatusOverview({
           <button
             type="button"
             onClick={onRunScan}
-            disabled={isScanning}
+            disabled={isScanning || !scanActionEnabled}
+            title={!scanActionEnabled ? scanActionReason : undefined}
             className="app-primary-button mt-3 inline-flex min-h-[42px] w-full items-center justify-between overflow-hidden rounded-[8px] border-[#2c74e5] px-0 text-[0.96rem] font-medium disabled:cursor-not-allowed disabled:opacity-60 xl:min-w-[248px]"
           >
             <span className="inline-flex flex-1 items-center justify-center gap-3 px-5">

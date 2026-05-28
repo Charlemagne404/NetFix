@@ -1,7 +1,7 @@
 use crate::diagnostics::{
     environment_info, export_local_report, generate_wlan_report_impl, run_allowlisted_fix,
-    run_windows_scan, system_metrics, EnvironmentInfo, FixConfirmation, FixExecutionResult,
-    ScanProgressEvent, ScanResult, SystemMetrics,
+    run_windows_scan, runtime_health, system_metrics, EnvironmentInfo, FixConfirmation,
+    FixExecutionResult, RuntimeHealth, ScanProgressEvent, ScanResult, SystemMetrics,
 };
 use tauri::{AppHandle, Emitter};
 
@@ -43,6 +43,11 @@ pub async fn generate_wlan_report() -> Result<FixExecutionResult, String> {
 #[tauri::command]
 pub async fn get_environment_info() -> Result<EnvironmentInfo, String> {
     Ok(environment_info())
+}
+
+#[tauri::command]
+pub async fn get_runtime_health() -> Result<RuntimeHealth, String> {
+    Ok(runtime_health())
 }
 
 #[tauri::command]

@@ -4,10 +4,17 @@ import { SafetyPill } from "@/components/common/SafetyPill";
 
 type FixActionCardProps = {
   fix: FixAction;
+  actionsEnabled: boolean;
+  disabledReason?: string;
   onRun: (fix: FixAction) => void;
 };
 
-export function FixActionCard({ fix, onRun }: FixActionCardProps) {
+export function FixActionCard({
+  fix,
+  actionsEnabled,
+  disabledReason,
+  onRun
+}: FixActionCardProps) {
   return (
     <article className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -28,7 +35,9 @@ export function FixActionCard({ fix, onRun }: FixActionCardProps) {
         <button
           type="button"
           onClick={() => onRun(fix)}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-sm font-semibold text-cyan-50 transition hover:border-cyan-200/45 hover:bg-cyan-300/15"
+          disabled={!actionsEnabled}
+          title={!actionsEnabled ? disabledReason : undefined}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-sm font-semibold text-cyan-50 transition hover:border-cyan-200/45 hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-55"
         >
           Preview & run
           <ArrowRight className="h-4 w-4" />
@@ -50,6 +59,12 @@ export function FixActionCard({ fix, onRun }: FixActionCardProps) {
       {fix.warning ? (
         <p className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
           {fix.warning}
+        </p>
+      ) : null}
+
+      {!actionsEnabled && disabledReason ? (
+        <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-sm leading-6 text-slate-300">
+          {disabledReason}
         </p>
       ) : null}
     </article>

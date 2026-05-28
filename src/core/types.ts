@@ -15,7 +15,7 @@ export type AppMode = "normal" | "technician";
 
 export type ThemeMode = "system" | "dark" | "light";
 
-export type WorkspaceMode = "live" | "preview" | "lab";
+export type WorkspaceMode = "live" | "preview" | "lab" | "degraded";
 
 export type ScanHistoryReason = "manual" | "scenario" | "verification";
 
@@ -121,6 +121,32 @@ export type FixExecutionResult = {
 export type EnvironmentInfo = ScanResult["environment"] & {
   isWindows: boolean;
   isTauri: boolean;
+};
+
+export type RuntimeIssueSeverity = "info" | "warning" | "error";
+
+export type RuntimeIssue = {
+  id: string;
+  severity: RuntimeIssueSeverity;
+  title: string;
+  detail: string;
+};
+
+export type RuntimeCapabilities = {
+  canRunTimelineScans: boolean;
+  canRunLiveScans: boolean;
+  canRunFixes: boolean;
+  canExportReports: boolean;
+  canCollectSystemMetrics: boolean;
+};
+
+export type RuntimeHealth = {
+  checkedAt: string;
+  state: "ready" | "preview" | "degraded";
+  summary: string;
+  detail: string;
+  capabilities: RuntimeCapabilities;
+  issues: RuntimeIssue[];
 };
 
 export type SystemMetrics = {

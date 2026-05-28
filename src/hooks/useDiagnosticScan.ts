@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { runDiagnosticEngine } from "@/core/diagnosticEngine";
 import type { DiagnosticNode, MockScenarioId, ScanProgress, ScanResult } from "@/core/types";
 import type { PlatformAdapter } from "@/platform/platformAdapter";
-import { withTimeout } from "@/utils/async";
+import { TimeoutError, withTimeout } from "@/utils/async";
 
 type UseDiagnosticScanInput = {
   adapter: PlatformAdapter;
@@ -85,10 +85,12 @@ export function useDiagnosticScan({
   const [activeNodeId, setActiveNodeId] = useState<string | undefined>();
   const [completedNodeIds, setCompletedNodeIds] = useState<string[]>([]);
   const [scanProgress, setScanProgress] = useState<ScanProgress | undefined>();
+  const [scanError, setScanError] = useState<string | undefined>();
   const runIdRef = useRef(0);
   const scanResultRef = useRef(initialScan);
   const activeNodeIdRef = useRef<string | undefined>(undefined);
   const completedNodeIdsRef = useRef<string[]>([]);
+  const isScanningRef = useRef(false);
 
   const isStaleRun = (runId: number) => runIdRef.current !== runId;
 
@@ -118,14 +120,22 @@ export function useDiagnosticScan({
     setDisplayNodes(nextScan.nodes);
     resetLiveState();
     setIsScanning(false);
+    isScanningRef.current = false;
+    setScanError(undefined);
   }, [resetLiveState]);
 
   const runScan = useCallback(
     async (scenarioId?: MockScenarioId) => {
+      if (isScanningRef.current) {
+        return undefined;
+      }
+
       const runId = runIdRef.current + 1;
       runIdRef.current = runId;
       const scanRunId = createScanRunId();
+      isScanningRef.current = true;
       setIsScanning(true);
+      setScanError(undefined);
       resetLiveState();
       setDisplayNodes(buildPendingNodes(scanResultRef.current.nodes));
 
@@ -165,10 +175,19 @@ export function useDiagnosticScan({
         );
       } catch (error) {
         if (!isStaleRun(runId)) {
+          const message =
+            error instanceof TimeoutError
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : "Aegis could not complete the diagnostic scan.";
           console.warn("Diagnostic scan did not complete", error);
+          runIdRef.current += 1;
           setDisplayNodes(scanResultRef.current.nodes);
           resetLiveState();
           setIsScanning(false);
+          isScanningRef.current = false;
+          setScanError(message);
         }
         return undefined;
       }
@@ -179,6 +198,8 @@ export function useDiagnosticScan({
       setDisplayNodes(finalScan.nodes);
       resetLiveState();
       setIsScanning(false);
+      isScanningRef.current = false;
+      setScanError(undefined);
       onScanComplete?.(finalScan);
       return finalScan;
     },
@@ -192,6 +213,7 @@ export function useDiagnosticScan({
     activeNodeId,
     completedNodeIds,
     scanProgress,
+    scanError,
     runScan,
     loadScan
   };

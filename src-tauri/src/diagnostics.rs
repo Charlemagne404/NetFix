@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::error::Error;
 use std::fs;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -109,6 +111,36 @@ pub struct EnvironmentInfo {
     pub is_admin: Option<bool>,
     pub is_windows: bool,
     pub is_tauri: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeIssue {
+    pub id: String,
+    pub severity: String,
+    pub title: String,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeCapabilities {
+    pub can_run_timeline_scans: bool,
+    pub can_run_live_scans: bool,
+    pub can_run_fixes: bool,
+    pub can_export_reports: bool,
+    pub can_collect_system_metrics: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeHealth {
+    pub checked_at: String,
+    pub state: String,
+    pub summary: String,
+    pub detail: String,
+    pub capabilities: RuntimeCapabilities,
+    pub issues: Vec<RuntimeIssue>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -282,6 +314,8 @@ struct HttpProbeFact {
 }
 
 const AGGRESSIVE_CONFIRMATION_PHRASE: &str = "RESET";
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 fn now_id() -> String {
     let millis = std::time::SystemTime::now()
@@ -590,12 +624,18 @@ fn node(
     }
 }
 
-fn run_process(program: &str, args: &[&str], timeout: Duration) -> Result<CommandOutput, Box<dyn Error>> {
-    let mut child = Command::new(program)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+fn run_process(
+    program: &str,
+    args: &[&str],
+    timeout: Duration,
+) -> Result<CommandOutput, Box<dyn Error>> {
+    let mut command = Command::new(program);
+    command.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    #[cfg(target_os = "windows")]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    let mut child = command.spawn()?;
 
     let start = Instant::now();
     loop {
@@ -628,6 +668,12 @@ fn powershell(command: &str) -> Result<CommandOutput, Box<dyn Error>> {
         &["-NoProfile", "-NonInteractive", "-Command", command],
         Duration::from_secs(8),
     )
+}
+
+fn command_probe(program: &str, args: &[&str], timeout: Duration) -> bool {
+    run_process(program, args, timeout)
+        .map(|output| output.success)
+        .unwrap_or(false)
 }
 
 fn hostname() -> Option<String> {
@@ -1123,37 +1169,6 @@ where
         None,
         "Finalizing the diagnosis...",
     ));
-}
-
-pub fn ensure_elevated_launch() {
-    if !cfg!(target_os = "windows") || current_process_is_admin() {
-        return;
-    }
-
-    let exe_path = match std::env::current_exe() {
-        Ok(path) => path,
-        Err(_) => return,
-    };
-    let exe_display = powershell_single_quoted(exe_path.to_string_lossy().as_ref());
-    let args = std::env::args()
-        .skip(1)
-        .map(|arg| powershell_single_quoted(&arg))
-        .collect::<Vec<_>>();
-    let args_expression = if args.is_empty() {
-        "@()".to_string()
-    } else {
-        format!("@({})", args.join(","))
-    };
-    let relaunch_script = format!(
-        "$argList = {args_expression}; try {{ Start-Process -FilePath {exe_display} -ArgumentList $argList -Verb RunAs | Out-Null; exit 0 }} catch {{ exit 1 }}"
-    );
-
-    if powershell(&relaunch_script)
-        .map(|output| output.success)
-        .unwrap_or(false)
-    {
-        std::process::exit(0);
-    }
 }
 
 fn join_non_empty(values: &[String], fallback: &str) -> String {
@@ -3474,6 +3489,96 @@ pub fn environment_info() -> EnvironmentInfo {
         is_admin: Some(current_process_is_admin()),
         is_windows: cfg!(target_os = "windows"),
         is_tauri: true,
+    }
+}
+
+pub fn runtime_health() -> RuntimeHealth {
+    if !cfg!(target_os = "windows") {
+        return RuntimeHealth {
+            checked_at: now_iso(),
+            state: "preview".to_string(),
+            summary: "Preview workspace".to_string(),
+            detail: "Live diagnostics and repair actions only run in the Windows Tauri app."
+                .to_string(),
+            capabilities: RuntimeCapabilities {
+                can_run_timeline_scans: true,
+                can_run_live_scans: false,
+                can_run_fixes: false,
+                can_export_reports: true,
+                can_collect_system_metrics: true,
+            },
+            issues: Vec::new(),
+        };
+    }
+
+    let mut issues = Vec::new();
+    let powershell_ready = command_probe(
+        "powershell.exe",
+        &["-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.Major"],
+        Duration::from_secs(5),
+    );
+    let netsh_ready = command_probe("netsh.exe", &["/?"], Duration::from_secs(5));
+    let is_admin = current_process_is_admin();
+
+    if !powershell_ready {
+        issues.push(RuntimeIssue {
+            id: "powershell".to_string(),
+            severity: "error".to_string(),
+            title: "PowerShell is unavailable".to_string(),
+            detail: "Aegis could not start powershell.exe, so live scan commands cannot run."
+                .to_string(),
+        });
+    }
+
+    if !netsh_ready {
+        issues.push(RuntimeIssue {
+            id: "netsh".to_string(),
+            severity: "error".to_string(),
+            title: "Windows networking tools are unavailable".to_string(),
+            detail: "Aegis could not start netsh.exe, so Wi-Fi and adapter diagnostics are paused."
+                .to_string(),
+        });
+    }
+
+    if !is_admin {
+        issues.push(RuntimeIssue {
+            id: "elevation".to_string(),
+            severity: "warning".to_string(),
+            title: "Aegis is not elevated".to_string(),
+            detail: "Live scans may still run, but administrator-only fixes stay blocked until Windows launches Aegis with elevated access."
+                .to_string(),
+        });
+    }
+
+    let live_actions_ready = powershell_ready && netsh_ready;
+
+    RuntimeHealth {
+        checked_at: now_iso(),
+        state: if live_actions_ready {
+            "ready".to_string()
+        } else {
+            "degraded".to_string()
+        },
+        summary: if live_actions_ready {
+            "Windows runtime ready".to_string()
+        } else {
+            "Windows runtime issue detected".to_string()
+        },
+        detail: if live_actions_ready {
+            "Aegis verified the native Windows command path for live diagnostics and allowlisted repair actions."
+                .to_string()
+        } else {
+            "Aegis paused live scan and fix actions because one or more required Windows command paths failed startup checks."
+                .to_string()
+        },
+        capabilities: RuntimeCapabilities {
+            can_run_timeline_scans: live_actions_ready,
+            can_run_live_scans: live_actions_ready,
+            can_run_fixes: live_actions_ready,
+            can_export_reports: true,
+            can_collect_system_metrics: true,
+        },
+        issues,
     }
 }
 

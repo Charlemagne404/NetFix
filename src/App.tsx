@@ -10,9 +10,17 @@ import { ConfirmFixModal } from "@/components/fixes/ConfirmFixModal";
 import { RepairPlanPanel } from "@/components/fixes/RepairPlanPanel";
 import { RepairVerificationPanel } from "@/components/fixes/RepairVerificationPanel";
 import { ReportPreview } from "@/components/reports/ReportPreview";
+import { RuntimeNotice } from "@/components/runtime/RuntimeNotice";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { createMockScanResult, getDefaultMockScenario } from "@/core/mockData";
 import { projectMockScenarioAfterFix } from "@/core/mockRepairOutcomes";
+import {
+  createLabRuntimeHealth,
+  createPreviewRuntimeHealth,
+  deriveWorkspaceMode,
+  getFixDisabledReason,
+  getScanDisabledReason
+} from "@/core/runtimeHealth";
 import {
   buildRepairBlockedVerification,
   buildRepairVerification
@@ -32,6 +40,7 @@ import type {
   MockScenarioId,
   RepairVerification,
   ReportFormat,
+  RuntimeHealth,
   ScanHistoryEntry,
   ScanHistoryReason,
   ScanResult,
@@ -105,6 +114,9 @@ export default function App() {
     isWindows: false,
     isTauri: false
   });
+  const [runtimeHealth, setRuntimeHealth] = useState<RuntimeHealth>(
+    createPreviewRuntimeHealth()
+  );
   const [repairVerification, setRepairVerification] =
     useState<RepairVerification | null>(null);
   const [isVerifyingFix, setIsVerifyingFix] = useState(false);
@@ -117,11 +129,7 @@ export default function App() {
   });
 
   const adapter = useMemo(() => (demoMode ? mockAdapter : tauriAdapter), [demoMode]);
-  const workspaceMode: WorkspaceMode = demoMode
-    ? "lab"
-    : environmentInfo.isWindows && environmentInfo.isTauri
-      ? "live"
-      : "preview";
+  const workspaceMode: WorkspaceMode = deriveWorkspaceMode(runtimeHealth, demoMode);
   const footerMetrics = useFooterMetrics(adapter);
 
   const {
@@ -131,6 +139,7 @@ export default function App() {
     activeNodeId,
     completedNodeIds,
     scanProgress,
+    scanError,
     runScan,
     loadScan
   } = useDiagnosticScan({
@@ -164,21 +173,37 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
 
-    void adapter
-      .getEnvironmentInfo()
-      .then((environment) => {
-        if (!cancelled) {
-          setEnvironmentInfo(environment);
+    void Promise.all([adapter.getEnvironmentInfo(), adapter.getRuntimeHealth()])
+      .then(([environment, health]) => {
+        if (cancelled) {
+          return;
         }
+
+        setEnvironmentInfo(environment);
+        setRuntimeHealth(demoMode ? createLabRuntimeHealth() : health);
       })
       .catch((error) => {
         console.warn("Failed to load runtime environment info", error);
+
+        if (!cancelled) {
+          const previewEnvironment = {
+            ...initialAppState.initialScan.environment,
+            isWindows: false,
+            isTauri: false
+          };
+          setEnvironmentInfo(previewEnvironment);
+          setRuntimeHealth(
+            demoMode
+              ? createLabRuntimeHealth()
+              : createPreviewRuntimeHealth(previewEnvironment)
+          );
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [adapter]);
+  }, [adapter, demoMode, initialAppState.initialScan.environment]);
 
   useEffect(() => {
     if (showRawOutput) {
@@ -189,6 +214,10 @@ export default function App() {
   const selectedNode =
     displayNodes.find((node) => node.id === selectedNodeId) ?? displayNodes[0];
   const totalChecks = scanResult.nodes.reduce((count, node) => count + node.evidence.length, 0);
+  const scanActionReason = getScanDisabledReason(runtimeHealth, demoMode);
+  const fixDisabledReason = getFixDisabledReason(runtimeHealth, demoMode);
+  const canRunScan = !scanActionReason;
+  const canRunFixes = !fixDisabledReason;
 
   const handleScenarioChange = (nextScenario: MockScenarioId) => {
     pendingHistoryCaptureRef.current = {
@@ -204,6 +233,10 @@ export default function App() {
   };
 
   const handleRunScan = () => {
+    if (!canRunScan) {
+      return;
+    }
+
     pendingHistoryCaptureRef.current = {
       reason: "manual",
       scenarioId
@@ -225,6 +258,18 @@ export default function App() {
   };
 
   const handleConfirmFix = async (fix: FixAction, confirmation?: FixConfirmation) => {
+    if (!canRunFixes) {
+      setPendingFix(null);
+      setFixResult({
+        fixId: fix.id,
+        status: "blocked",
+        title: "Repair action unavailable",
+        message: fixDisabledReason ?? "Aegis cannot run live repair actions in this session.",
+        requiresAdmin: fix.requiresAdmin
+      });
+      return;
+    }
+
     const beforeScan = scanResult;
     setFixBusy(true);
     setRepairVerification(null);
@@ -314,6 +359,8 @@ export default function App() {
       workspaceMode={workspaceMode}
       environmentInfo={environmentInfo}
       footerMetrics={footerMetrics}
+      scanActionEnabled={canRunScan}
+      scanActionReason={scanActionReason}
       onModeChange={setMode}
       onThemeChange={setTheme}
       onRunScan={handleRunScan}
@@ -321,6 +368,8 @@ export default function App() {
       onOpenSettings={() => setSettingsOpen(true)}
     >
       <div className="grid min-w-0 gap-3 lg:min-h-full lg:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
+        <RuntimeNotice runtimeHealth={runtimeHealth} scanError={scanError} />
+
         <StatusOverview
           diagnosis={scanResult.diagnosis}
           completedChecks={totalChecks}
@@ -328,6 +377,8 @@ export default function App() {
           isScanning={isScanning}
           scanProgress={scanProgress}
           totalTimelineNodes={displayNodes.length}
+          scanActionEnabled={canRunScan}
+          scanActionReason={scanActionReason}
           onRunScan={handleRunScan}
           onViewReport={() => setReportOpen(true)}
         />
@@ -356,6 +407,10 @@ export default function App() {
             diagnosis={scanResult.diagnosis}
             fixResult={fixResult}
             isScanning={isScanning}
+            fixesEnabled={canRunFixes}
+            fixesDisabledReason={fixDisabledReason}
+            scanActionEnabled={canRunScan}
+            scanActionReason={scanActionReason}
             onOpenAdvancedOptions={() => setSettingsOpen(true)}
             onRunFix={setPendingFix}
             onRunScan={handleRunScan}
@@ -365,7 +420,13 @@ export default function App() {
 
         {selectedNode ? (
           <div className="grid min-w-0 gap-3 overflow-hidden lg:min-h-0 lg:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
-            <DetailsPanel node={selectedNode} mode={mode} onRunFix={setPendingFix} />
+            <DetailsPanel
+              node={selectedNode}
+              mode={mode}
+              fixesEnabled={canRunFixes}
+              fixesDisabledReason={fixDisabledReason}
+              onRunFix={setPendingFix}
+            />
 
             <div className="grid min-w-0 gap-3 content-start lg:min-h-0 lg:grid-rows-[auto_minmax(0,1fr)]">
               <RepairVerificationPanel
