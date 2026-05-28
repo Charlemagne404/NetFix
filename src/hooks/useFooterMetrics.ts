@@ -121,7 +121,7 @@ export function useFooterMetrics(adapter: PlatformAdapter) {
       disposed = true;
       window.clearInterval(intervalId);
     };
-  }, [adapter, pollMetrics]);
+  }, [adapter]);
 
   return metrics;
 }

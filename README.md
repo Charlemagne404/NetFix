@@ -1,36 +1,42 @@
-# Aegis Network Doctor
+# Aegis Trace
 
-Aegis Network Doctor is a polished Windows desktop app for visual Wi-Fi and network diagnostics. Its core experience is an interactive diagnostic timeline that shows where the connection chain breaks:
+Aegis Trace is a mock-first Tauri desktop app for visual Wi-Fi and network diagnostics on Windows. The product centers on a left-to-right diagnostic timeline that shows where the connection path breaks across:
 
-Device → Adapter → Wi-Fi → Profile → IP Address → Gateway → Internet → DNS → Windows Status → Apps.
+Device -> Adapter -> Wi-Fi -> Profile -> IP Address -> Gateway -> Internet -> DNS -> Windows Status -> Apps
 
-The app is mock-first so the full interface works on non-Windows machines. Real Windows diagnostics are isolated behind a Tauri platform adapter and Rust command allowlists.
+## Current State
 
-## Current Capabilities
+The project already has a usable React/Tauri shell, a typed diagnostic model, realistic mock scenarios, ranked repair recommendations, local report export, and a Windows-only backend for live probes and allowlisted fixes.
 
-- Dark, timeline-first React dashboard with animated scan replay.
-- Ten realistic mock diagnostic scenarios.
-- Typed diagnostic model, scoring logic, ranked fix registry, and platform abstraction.
+What is implemented today:
+
+- Timeline-first dashboard with animated scan progression.
 - Normal and Technician modes.
-- Safe fix previews and confirmation modal before execution.
-- Automatic repair verification with before/after timeline comparison.
-- Persistent local scan history with restore-to-workspace behavior.
-- Local JSON/HTML report generation.
-- Tauri v2 backend with comprehensive Windows probes, richer confidence-based diagnosis, and allowlisted repair execution.
+- Ten mock scenarios for cross-platform development and demos.
+- Local scan history with restore-on-load behavior.
+- Repair confirmation flow with command previews and post-fix verification.
+- Local JSON, HTML, and ZIP case-file export.
+- Tauri v2 command surface for live Windows scans, report export, and allowlisted fix execution.
+- Windows compile validation in GitHub Actions.
 
-## Safety And Privacy
+What is still limited:
 
-Aegis is designed to diagnose before repairing.
+- Real diagnostics and repair execution only work in the Windows Tauri runtime.
+- Browser development mode falls back to preview or mock data and does not execute live fixes.
+- Runtime validation on real Windows hardware is still needed for broader confidence.
+- Code-signing and polished release automation are scaffolded, not finished.
 
-- No telemetry.
-- No report uploads.
-- No Wi-Fi password extraction.
-- No arbitrary command execution from the frontend.
-- Frontend sends scan requests and fix IDs only.
-- Backend maps fix IDs to fixed allowlisted commands.
-- Every fix shows command previews before execution.
-- Moderate and aggressive fixes stay allowlisted, previewed, and confirmation-gated. Targeted adapter/profile fixes resolve their own context inside the backend before execution.
-- Exported reports stay local and include a privacy warning because they may contain adapter names, IP addresses, DNS servers, and command output.
+## Safety Model
+
+Aegis Trace is built around diagnosis before repair.
+
+- No arbitrary shell input from the frontend.
+- Frontend requests scans and allowlisted fix IDs only.
+- Fix execution is mapped in the backend to fixed commands with confirmation gates.
+- Moderate and aggressive repairs require explicit confirmation.
+- Reports stay local.
+- Saved Wi-Fi passwords are never read or exported.
+- Telemetry and report uploads are not implemented.
 
 ## Development
 
@@ -40,7 +46,7 @@ Install dependencies:
 npm install
 ```
 
-Run the web app in development mode:
+Run the browser preview:
 
 ```bash
 npm run dev
@@ -58,85 +64,32 @@ Build the frontend:
 npm run build
 ```
 
-Run the Tauri app on a machine with Rust installed:
+Run the Tauri desktop app:
 
 ```bash
 npm run tauri dev
 ```
 
-This environment did not have `cargo`/`rustc`, so the frontend was validated here and the Rust/Tauri backend still needs compile/runtime validation on Windows.
+Windows compile validation runs in [`.github/workflows/windows-validate.yml`](./.github/workflows/windows-validate.yml). It covers frontend tests, frontend build, and Rust `cargo check` on `windows-latest`, but it does not replace live runtime testing on a real Windows machine.
 
-## Architecture
+## Project Layout
 
 ```text
 src/
-  components/
-    dashboard/      status cards and scan history
-    details/        node explanation, evidence, technician details
-    fixes/          fix cards and confirmation modal
-    layout/         app shell
-    reports/        local report preview/export UI
-    settings/       mode, theme, scenario controls
-    timeline/       diagnostic timeline and nodes
-  core/
-    types.ts              shared diagnostic model
-    timelineDefinition.ts timeline order and checks
-    fixRegistry.ts        fix metadata and command previews
-    diagnosisScoring.ts   diagnosis rules and fix ranking
-    mockData.ts           realistic demo scenarios
-    diagnosticEngine.ts   adapter orchestration
-    reportExport.ts       JSON/HTML report builders
-  platform/
-    mockAdapter.ts   mock scan/fix/report behavior
-    tauriAdapter.ts  Tauri command bridge with mock fallback
-  hooks/
-    useDiagnosticScan.ts  scan replay state machine
+  components/     React UI for dashboard, timeline, details, fixes, reports, and settings
+  core/           typed models, mock scenarios, scoring, report export, history, repair verification
+  hooks/          scan orchestration and footer metrics
+  platform/       browser/mock/Tauri adapters
 
 src-tauri/
-  src/
-    commands.rs      Tauri command entrypoints
-    diagnostics.rs   Windows read-only checks and allowlisted fixes
+  src/            Tauri commands and Windows diagnostics/fix logic
+  tauri.conf.json app metadata and bundle defaults
+  tauri.windows.conf.json Windows installer bundle config
+  tauri.windows.release.conf.json optional signing overlay
 ```
 
-## Mock Scenarios
+## Windows Packaging
 
-- Healthy connection
-- DNS failure
-- DHCP failure / APIPA
-- No Wi-Fi adapter
-- WLAN service stopped
-- Gateway unreachable
-- Internet unreachable but router reachable
-- Proxy/app issue
-- Windows false no-internet
-- Captive portal suspected
-
-## Roadmap
-
-v0.1:
-- Polished mock UI
-- Interactive timeline
-- Mock scenarios
-
-v0.2:
-- Real read-only Windows diagnostics
-- Scan reports
-
-v0.3:
-- Safe fixes
-- Automatic repair verification
-- Local-only scan history
-
-v0.4:
-- Technician mode
-- Event log parsing
-- WLAN report integration
-
-v0.5:
-- Moderate fixes with confirmations
-- Better diagnosis scoring
-
-v1.0:
-- Installer
-- Signed builds if possible
-- Export case files
+- Windows installer targets are configured in [`src-tauri/tauri.windows.conf.json`](./src-tauri/tauri.windows.conf.json).
+- Optional signing overlay guidance lives in [`docs/windows-release.md`](./docs/windows-release.md).
+- ZIP case files include a plain-language summary, structured scan JSON, a styled HTML timeline report, manifest metadata, and raw per-node output when available.

@@ -1,8 +1,8 @@
-# AGENTS.md — Aegis Network Doctor
+# AGENTS.md — Aegis Trace
 
 ## Project Identity
 
-Aegis Network Doctor is a polished Windows desktop application focused on visually diagnosing and safely repairing Wi‑Fi and networking issues.
+Aegis Trace is a polished Windows desktop application focused on visually diagnosing and safely repairing Wi‑Fi and networking issues.
 
 The core identity of the app is:
 
@@ -531,7 +531,7 @@ Stay focused on:
 
 # Final Guiding Principle
 
-Aegis Network Doctor should make networking issues feel understandable.
+Aegis Trace should make networking issues feel understandable.
 
 Users should be able to look at the timeline and immediately understand:
 

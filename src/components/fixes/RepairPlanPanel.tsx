@@ -114,7 +114,7 @@ export function RepairPlanPanel({
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RotateCcw className="h-4 w-4" />
-            {isScanning ? "Re-running tests" : "Re-run tests"}
+            {isScanning ? "Re-running scan" : "Re-run scan"}
           </button>
 
           <button

@@ -1,0 +1,7 @@
+tokens:
+  azure:
+    type: azure
+keys:
+  azure:
+    token: azure
+    id: https://<KEY_VAULT_NAME>.vault.azure.net/certificates/<CERTIFICATE_NAME>

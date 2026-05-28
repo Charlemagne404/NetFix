@@ -17,7 +17,7 @@ export function ScenarioSwitcher({
   if (compact) {
     return (
       <label className="inline-flex items-center gap-2 rounded-[12px] border border-[color:var(--aegis-line-soft)] bg-[rgba(118,146,188,0.04)] px-3 py-2 text-[11px] text-slate-500">
-        <span className="shrink-0 uppercase tracking-[0.08em] text-slate-500">Scenario</span>
+        <span className="shrink-0 uppercase tracking-[0.08em] text-slate-500">Lab case</span>
         <select
           value={value}
           onChange={(event) => onChange(event.target.value as MockScenarioId)}
@@ -35,7 +35,7 @@ export function ScenarioSwitcher({
 
   return (
     <label className="grid gap-1 text-[11px] text-slate-500">
-      Demo scenario
+      Lab case
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as MockScenarioId)}

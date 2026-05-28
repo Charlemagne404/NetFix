@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::error::Error;
@@ -3438,16 +3439,30 @@ pub fn generate_wlan_report_impl() -> Result<FixExecutionResult, Box<dyn Error>>
     run_allowlisted_fix("generate-wlan-report", None)
 }
 
-pub fn export_local_report(format: &str, content: &str) -> Result<String, Box<dyn Error>> {
+pub fn export_local_report(
+    format: &str,
+    content: &str,
+    encoding: Option<&str>,
+) -> Result<String, Box<dyn Error>> {
     let extension = match format {
         "json" => "json",
         "html" => "html",
+        "zip" => "zip",
         _ => "txt",
     };
-    let directory = std::env::temp_dir().join("Aegis Network Doctor");
+    let directory = std::env::temp_dir().join("Aegis Trace");
     fs::create_dir_all(&directory)?;
-    let path = directory.join(format!("aegis-network-report-{}.{}", now_id(), extension));
-    fs::write(&path, content)?;
+    let prefix = if format == "zip" {
+        "aegis-trace-case"
+    } else {
+        "aegis-network-report"
+    };
+    let path = directory.join(format!("{}-{}.{}", prefix, now_id(), extension));
+    let bytes = match encoding.unwrap_or("utf8") {
+        "base64" => BASE64_STANDARD.decode(content)?,
+        _ => content.as_bytes().to_vec(),
+    };
+    fs::write(&path, bytes)?;
     Ok(path.to_string_lossy().to_string())
 }
 

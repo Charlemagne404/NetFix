@@ -1,7 +1,14 @@
 import { createMockScanResult } from "@/core/mockData";
 import { TIMELINE_DEFINITION } from "@/core/timelineDefinition";
 import { isAllowlistedFixId } from "@/core/fixRegistry";
-import { buildHtmlReport, buildJsonReport, downloadTextFile } from "@/core/reportExport";
+import {
+  buildHtmlReport,
+  buildJsonReport,
+  buildZipCaseFile,
+  downloadBinaryFile,
+  downloadTextFile,
+  reportFilename
+} from "@/core/reportExport";
 import packageInfo from "../../package.json";
 import type { PlatformAdapter } from "./platformAdapter";
 
@@ -58,23 +65,29 @@ export const mockAdapter: PlatformAdapter = {
       title: fix.title,
       message:
         confirmation?.acknowledged
-          ? "Demo mode simulated the confirmed allowlisted fix. No command was executed and no system setting was changed."
-          : "Demo mode simulated the fix. No command was executed and no system setting was changed.",
+          ? "Diagnostic lab simulated the confirmed allowlisted fix. No command was executed and no system setting was changed."
+          : "Diagnostic lab simulated the fix. No command was executed and no system setting was changed.",
       stdout: fix.commandsPreview?.join("\n"),
       requiresAdmin: fix.requiresAdmin
     };
   },
   async exportReport(scan, format) {
+    const filename = reportFilename(scan, format);
+
+    if (format === "zip") {
+      const content = await buildZipCaseFile(scan);
+      downloadBinaryFile(filename, content, "application/zip");
+      return filename;
+    }
+
     const content = format === "json" ? buildJsonReport(scan) : buildHtmlReport(scan);
-    const extension = format === "json" ? "json" : "html";
-    const filename = `aegis-network-report-${scan.id}.${extension}`;
     downloadTextFile(filename, content, format === "json" ? "application/json" : "text/html");
     return filename;
   },
   async getEnvironmentInfo() {
     return {
       os: navigator.platform || "Unknown",
-      hostname: "Local demo",
+      hostname: "Preview workspace",
       appVersion: packageInfo.version,
       isAdmin: false,
       isWindows: navigator.userAgent.toLowerCase().includes("windows"),

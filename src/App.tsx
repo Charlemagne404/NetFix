@@ -31,10 +31,12 @@ import type {
   FixExecutionResult,
   MockScenarioId,
   RepairVerification,
+  ReportFormat,
   ScanHistoryEntry,
   ScanHistoryReason,
   ScanResult,
-  ThemeMode
+  ThemeMode,
+  WorkspaceMode
 } from "@/core/types";
 import { useDiagnosticScan } from "@/hooks/useDiagnosticScan";
 import { useFooterMetrics } from "@/hooks/useFooterMetrics";
@@ -76,7 +78,7 @@ function resolveInitialAppState() {
     history,
     initialScenarioId,
     initialScan: latestEntry?.scan ?? createMockScanResult(initialScenarioId),
-    initialDemoMode: latestEntry ? latestEntry.scan.mode !== "real" : true
+    initialDemoMode: false
   };
 }
 
@@ -115,6 +117,11 @@ export default function App() {
   });
 
   const adapter = useMemo(() => (demoMode ? mockAdapter : tauriAdapter), [demoMode]);
+  const workspaceMode: WorkspaceMode = demoMode
+    ? "lab"
+    : environmentInfo.isWindows && environmentInfo.isTauri
+      ? "live"
+      : "preview";
   const footerMetrics = useFooterMetrics(adapter);
 
   const {
@@ -293,7 +300,7 @@ export default function App() {
     }
   };
 
-  const handleExportReport = (format: "json" | "html") => {
+  const handleExportReport = (format: ReportFormat) => {
     void adapter.exportReport(scanResult, format);
   };
 
@@ -303,13 +310,12 @@ export default function App() {
       scan={scanResult}
       mode={mode}
       theme={theme}
-      scenarioId={scenarioId}
       isScanning={isScanning}
-      demoMode={demoMode}
+      workspaceMode={workspaceMode}
+      environmentInfo={environmentInfo}
       footerMetrics={footerMetrics}
       onModeChange={setMode}
       onThemeChange={setTheme}
-      onScenarioChange={handleScenarioChange}
       onRunScan={handleRunScan}
       onExportReport={() => setReportOpen(true)}
       onOpenSettings={() => setSettingsOpen(true)}
@@ -399,9 +405,12 @@ export default function App() {
       <SettingsPanel
         open={settingsOpen}
         demoMode={demoMode}
+        environmentInfo={environmentInfo}
         rawOutput={showRawOutput}
+        scenarioId={scenarioId}
         onDemoModeChange={setDemoMode}
         onRawOutputChange={setShowRawOutput}
+        onScenarioChange={handleScenarioChange}
         onClose={() => setSettingsOpen(false)}
       />
     </AppShell>

@@ -150,7 +150,7 @@ export function StatusOverview({
           >
             <span className="inline-flex flex-1 items-center justify-center gap-3 px-5">
               <Play className={cn("h-4 w-4", isScanning && "animate-pulse")} fill="currentColor" />
-              {isScanning ? "Running diagnostics" : "Run Diagnosis"}
+              {isScanning ? "Running scan" : "Run scan"}
             </span>
             <span className="flex h-full items-center border-l border-white/10 px-3.5 text-white/75">
               <ChevronDown className="h-4 w-4" />

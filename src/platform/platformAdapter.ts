@@ -4,6 +4,7 @@ import type {
   FixConfirmation,
   FixExecutionResult,
   MockScenarioId,
+  ReportFormat,
   ScanProgress,
   ScanResult,
   SystemMetrics
@@ -22,7 +23,7 @@ export type PlatformAdapter = {
     fix: FixAction,
     confirmation?: FixConfirmation
   ) => Promise<FixExecutionResult>;
-  exportReport: (scan: ScanResult, format: "json" | "html") => Promise<string>;
+  exportReport: (scan: ScanResult, format: ReportFormat) => Promise<string>;
   getEnvironmentInfo: () => Promise<EnvironmentInfo>;
   getSystemMetrics: () => Promise<SystemMetrics>;
 };

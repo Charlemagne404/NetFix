@@ -12,7 +12,7 @@ type RecentScansProps = {
 
 const reasonLabels: Record<ScanHistoryEntry["reason"], string> = {
   manual: "Manual",
-  scenario: "Scenario",
+  scenario: "Lab case",
   verification: "Repair check"
 };
 
@@ -28,6 +28,14 @@ export function RecentScans({
   onSelectScan,
   onClearHistory
 }: RecentScansProps) {
+  const getSourceLabel = (entry: ScanHistoryEntry) => {
+    if (entry.scan.mode === "real") {
+      return "Live Windows scan";
+    }
+
+    return entry.reason === "scenario" ? "Lab replay" : "Preview data";
+  };
+
   return (
     <section className="app-panel min-w-0 rounded-[14px]">
       <div className="flex items-start justify-between gap-3 border-b border-[color:var(--aegis-line-soft)] px-5 py-4">
@@ -109,9 +117,7 @@ export function RecentScans({
                   </div>
 
                   <div className="mt-4 flex items-center justify-between gap-3">
-                    <div className="text-xs text-slate-500">
-                      {entry.scan.mode === "mock" ? "Mock scenario" : "Windows scan"}
-                    </div>
+                    <div className="text-xs text-slate-500">{getSourceLabel(entry)}</div>
 
                     <button
                       type="button"

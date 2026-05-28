@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Aegis Network Doctor",
+  "productName": "Aegis Trace",
   "version": "0.1.0",
-  "identifier": "com.aegis.network-doctor",
+  "identifier": "com.aegis.trace",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://127.0.0.1:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Aegis Network Doctor",
+        "title": "Aegis Trace",
         "width": 1440,
         "height": 980,
         "minWidth": 1100,
@@ -27,6 +27,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "Aegis Trace",
+    "homepage": "https://github.com/charlemagne404/NetFix",
+    "shortDescription": "Visual Wi-Fi and network diagnostics for Windows.",
+    "longDescription": "Aegis Trace explains where the connection chain breaks, shows evidence, and offers allowlisted repairs only after diagnosis.",
     "icon": [
       "icons/icon.ico"
     ],

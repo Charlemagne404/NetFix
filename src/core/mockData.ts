@@ -708,10 +708,10 @@ function scenarioPatches(id: MockScenarioId): NodePatch[] {
   }
 }
 
-export function createMockScanResult(scenarioId: MockScenarioId = "dhcp-apipa"): ScanResult {
+export function createMockScanResult(scenarioId: MockScenarioId = "healthy"): ScanResult {
   return makeScan(scenarioId, scenarioPatches(scenarioId));
 }
 
 export function getDefaultMockScenario(): MockScenarioId {
-  return "dhcp-apipa";
+  return "healthy";
 }

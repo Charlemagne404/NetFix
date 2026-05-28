@@ -12,7 +12,7 @@ pub async fn run_scan(
     run_id: String,
 ) -> Result<ScanResult, String> {
     run_windows_scan(scenario_id, &run_id, |progress: ScanProgressEvent| {
-        let _ = app.emit("aegis://scan-progress", progress);
+        let _ = app.emit("aegis-trace://scan-progress", progress);
     })
     .map_err(|error| error.to_string())
 }
@@ -30,8 +30,9 @@ pub async fn export_report(
     _scan: serde_json::Value,
     format: String,
     content: String,
+    encoding: Option<String>,
 ) -> Result<String, String> {
-    export_local_report(&format, &content).map_err(|error| error.to_string())
+    export_local_report(&format, &content, encoding.as_deref()).map_err(|error| error.to_string())
 }
 
 #[tauri::command]

@@ -2,13 +2,22 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { createMockScanResult } from "@/core/mockData";
 import { isAllowlistedFixId } from "@/core/fixRegistry";
-import { buildHtmlReport, buildJsonReport } from "@/core/reportExport";
+import {
+  buildHtmlReport,
+  buildJsonReport,
+  buildZipCaseFile,
+  downloadBinaryFile,
+  downloadTextFile,
+  reportFilename,
+  uint8ArrayToBase64
+} from "@/core/reportExport";
 import packageInfo from "../../package.json";
 import type {
   EnvironmentInfo,
   FixAction,
   FixConfirmation,
   FixExecutionResult,
+  ReportFormat,
   ScanProgress,
   ScanResult,
   SystemMetrics
@@ -24,6 +33,12 @@ declare global {
 export function hasTauriRuntime(): boolean {
   return typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__);
 }
+
+type SerializedReportPayload = {
+  content: string;
+  encoding: "utf8" | "base64";
+  mimeType: string;
+};
 
 function browserEnvironmentInfo(): EnvironmentInfo {
   return {
@@ -90,6 +105,51 @@ async function invokeWithMockFallback<T>(
   }
 }
 
+async function serializeReport(
+  scan: ScanResult,
+  format: ReportFormat
+): Promise<SerializedReportPayload> {
+  if (format === "json") {
+    return {
+      content: buildJsonReport(scan),
+      encoding: "utf8",
+      mimeType: "application/json"
+    };
+  }
+
+  if (format === "html") {
+    return {
+      content: buildHtmlReport(scan),
+      encoding: "utf8",
+      mimeType: "text/html"
+    };
+  }
+
+  const content = await buildZipCaseFile(scan);
+  return {
+    content: uint8ArrayToBase64(content),
+    encoding: "base64",
+    mimeType: "application/zip"
+  };
+}
+
+async function exportReportFallback(
+  scan: ScanResult,
+  format: ReportFormat,
+  payload: SerializedReportPayload
+): Promise<string> {
+  const filename = reportFilename(scan, format);
+
+  if (format === "zip") {
+    const content = await buildZipCaseFile(scan);
+    downloadBinaryFile(filename, content, payload.mimeType);
+    return filename;
+  }
+
+  downloadTextFile(filename, payload.content, payload.mimeType);
+  return filename;
+}
+
 export const tauriAdapter: PlatformAdapter = {
   kind: "tauri",
   async runScan({ scenarioId, runId, onProgress }) {
@@ -100,7 +160,7 @@ export const tauriAdapter: PlatformAdapter = {
 
     const unlisten =
       onProgress && hasTauriRuntime()
-        ? await listen<ScanProgress>("aegis://scan-progress", (event) => {
+        ? await listen<ScanProgress>("aegis-trace://scan-progress", (event) => {
             if (event.payload.runId === runId) {
               onProgress(event.payload);
             }
@@ -151,19 +211,23 @@ export const tauriAdapter: PlatformAdapter = {
     );
   },
   async exportReport(scan, format) {
-    const content = format === "json" ? buildJsonReport(scan) : buildHtmlReport(scan);
-    return invokeWithMockFallback<string>(
-      "export_report",
-      { scan, format, content },
-      () => {
-        const blob = new Blob([content], {
-          type: format === "json" ? "application/json" : "text/html"
-        });
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank", "noopener,noreferrer");
-        return `Opened report preview (${format})`;
-      }
-    );
+    const payload = await serializeReport(scan, format);
+
+    if (!hasTauriRuntime()) {
+      return exportReportFallback(scan, format, payload);
+    }
+
+    try {
+      return await invoke<string>("export_report", {
+        scan,
+        format,
+        content: payload.content,
+        encoding: payload.encoding
+      });
+    } catch (error) {
+      console.warn("Tauri command export_report failed; using browser fallback", error);
+      return exportReportFallback(scan, format, payload);
+    }
   },
   async getEnvironmentInfo() {
     return getResolvedEnvironmentInfo();

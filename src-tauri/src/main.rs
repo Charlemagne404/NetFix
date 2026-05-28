@@ -19,7 +19,7 @@ pub fn run() {
             commands::get_system_metrics
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Aegis Network Doctor");
+        .expect("error while running Aegis Trace");
 }
 
 fn main() {

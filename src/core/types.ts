@@ -15,7 +15,11 @@ export type AppMode = "normal" | "technician";
 
 export type ThemeMode = "system" | "dark" | "light";
 
+export type WorkspaceMode = "live" | "preview" | "lab";
+
 export type ScanHistoryReason = "manual" | "scenario" | "verification";
+
+export type ReportFormat = "json" | "html" | "zip";
 
 export type RepairVerificationStatus =
   | "resolved"
