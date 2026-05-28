@@ -676,13 +676,27 @@ fn command_probe(program: &str, args: &[&str], timeout: Duration) -> bool {
         .unwrap_or(false)
 }
 
+fn join_runtime_problems(problems: &[&str]) -> String {
+    match problems {
+        [] => String::new(),
+        [only] => (*only).to_string(),
+        [first, second] => format!("{first} and {second}"),
+        _ => {
+            let mut text = problems[..problems.len() - 1].join(", ");
+            text.push_str(", and ");
+            text.push_str(problems.last().copied().unwrap_or_default());
+            text
+        }
+    }
+}
+
 fn hostname() -> Option<String> {
     std::env::var("COMPUTERNAME")
         .or_else(|_| std::env::var("HOSTNAME"))
         .ok()
 }
 
-fn current_process_is_admin() -> bool {
+pub fn current_process_is_admin() -> bool {
     if !cfg!(target_os = "windows") {
         return false;
     }
@@ -3512,15 +3526,21 @@ pub fn runtime_health() -> RuntimeHealth {
     }
 
     let mut issues = Vec::new();
+    let mut failed_checks = Vec::new();
     let powershell_ready = command_probe(
         "powershell.exe",
         &["-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.Major"],
         Duration::from_secs(5),
     );
-    let netsh_ready = command_probe("netsh.exe", &["/?"], Duration::from_secs(5));
+    let netsh_ready = command_probe(
+        "netsh.exe",
+        &["interface", "show", "interface"],
+        Duration::from_secs(5),
+    );
     let is_admin = current_process_is_admin();
 
     if !powershell_ready {
+        failed_checks.push("PowerShell");
         issues.push(RuntimeIssue {
             id: "powershell".to_string(),
             severity: "error".to_string(),
@@ -3531,11 +3551,12 @@ pub fn runtime_health() -> RuntimeHealth {
     }
 
     if !netsh_ready {
+        failed_checks.push("netsh");
         issues.push(RuntimeIssue {
             id: "netsh".to_string(),
             severity: "error".to_string(),
             title: "Windows networking tools are unavailable".to_string(),
-            detail: "Aegis could not start netsh.exe, so Wi-Fi and adapter diagnostics are paused."
+            detail: "Aegis could not run `netsh interface show interface`, so Wi-Fi and adapter diagnostics are paused."
                 .to_string(),
         });
     }
@@ -3551,6 +3572,29 @@ pub fn runtime_health() -> RuntimeHealth {
     }
 
     let live_actions_ready = powershell_ready && netsh_ready;
+    let failed_checks_label = join_runtime_problems(&failed_checks);
+    let runtime_summary = if live_actions_ready {
+        "Windows runtime ready".to_string()
+    } else if failed_checks.is_empty() {
+        "Windows runtime issue detected".to_string()
+    } else {
+        format!("Windows runtime issue detected: {} unavailable", failed_checks_label)
+    };
+    let runtime_detail = if live_actions_ready {
+        "Aegis verified the native Windows command path for live diagnostics and allowlisted repair actions."
+            .to_string()
+    } else {
+        let mut detail = format!(
+            "Aegis paused live scan and fix actions because these startup checks failed: {}.",
+            failed_checks_label
+        );
+        if !is_admin {
+            detail.push_str(
+                " Aegis is also not elevated, so administrator-only fixes stay blocked until Windows launches it with elevated access.",
+            );
+        }
+        detail
+    };
 
     RuntimeHealth {
         checked_at: now_iso(),
@@ -3559,18 +3603,8 @@ pub fn runtime_health() -> RuntimeHealth {
         } else {
             "degraded".to_string()
         },
-        summary: if live_actions_ready {
-            "Windows runtime ready".to_string()
-        } else {
-            "Windows runtime issue detected".to_string()
-        },
-        detail: if live_actions_ready {
-            "Aegis verified the native Windows command path for live diagnostics and allowlisted repair actions."
-                .to_string()
-        } else {
-            "Aegis paused live scan and fix actions because one or more required Windows command paths failed startup checks."
-                .to_string()
-        },
+        summary: runtime_summary,
+        detail: runtime_detail,
         capabilities: RuntimeCapabilities {
             can_run_timeline_scans: live_actions_ready,
             can_run_live_scans: live_actions_ready,
@@ -3597,7 +3631,7 @@ pub fn system_metrics() -> SystemMetrics {
     system.refresh_cpu_usage();
 
     let mut networks = Networks::new_with_refreshed_list();
-    networks.refresh(true);
+    networks.refresh();
 
     let (network_received_bytes, network_transmitted_bytes) = networks
         .iter()
@@ -3613,10 +3647,43 @@ pub fn system_metrics() -> SystemMetrics {
         collected_at: now_iso(),
         source: "system".to_string(),
         uptime_seconds: Some(System::uptime()),
-        cpu_usage_percent: Some(system.global_cpu_usage()),
+        cpu_usage_percent: Some(system.global_cpu_info().cpu_usage()),
         memory_used_bytes: Some(system.used_memory()),
         memory_total_bytes: Some(system.total_memory()),
         network_received_bytes: Some(network_received_bytes),
         network_transmitted_bytes: Some(network_transmitted_bytes),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_windows_scan;
+    use super::join_runtime_problems;
+
+    #[test]
+    fn joins_runtime_problems_readably() {
+        assert_eq!(join_runtime_problems(&[]), "");
+        assert_eq!(join_runtime_problems(&["PowerShell"]), "PowerShell");
+        assert_eq!(
+            join_runtime_problems(&["PowerShell", "netsh"]),
+            "PowerShell and netsh"
+        );
+        assert_eq!(
+            join_runtime_problems(&["PowerShell", "netsh", "elevation"]),
+            "PowerShell, netsh, and elevation"
+        );
+    }
+
+    #[test]
+    fn windows_scan_returns_a_result() {
+        let result = run_windows_scan(None, "test-run", |_| {});
+        assert!(
+            result.is_ok(),
+            "run_windows_scan failed: {}",
+            result
+                .err()
+                .map(|error| error.to_string())
+                .unwrap_or_else(|| "unknown error".to_string())
+        );
     }
 }
