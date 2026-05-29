@@ -67,8 +67,11 @@ export function DiagnosticTimeline({
             <div className="grid grid-cols-9 gap-0">
               {nodes.slice(0, -1).map((node, index) => {
                 const rightNode = nodes[index + 1];
+                const connectorHasResolvedStatus =
+                  node.status !== "pending" || rightNode.status !== "pending";
                 const liveConnectorClass =
                   isScanning &&
+                  !connectorHasResolvedStatus &&
                   (index < activeIndex ||
                     (completedNodeIdSet.has(node.id) && completedNodeIdSet.has(rightNode?.id ?? "")))
                     ? "bg-[linear-gradient(90deg,#31baf7_0%,#67e8f9_100%)] shadow-[0_0_12px_rgba(56,189,248,0.14)]"

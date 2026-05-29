@@ -1,11 +1,12 @@
 import { AlertCircle, ChevronDown, Play, Wifi } from "lucide-react";
 import { motion } from "framer-motion";
-import type { OverallDiagnosis, ScanProgress } from "@/core/types";
+import type { DiagnosticNode, OverallDiagnosis, ScanProgress } from "@/core/types";
 import { cn } from "@/utils/cn";
 import { severityLabels } from "@/utils/status";
 
 type StatusOverviewProps = {
   diagnosis: OverallDiagnosis;
+  liveNodes: DiagnosticNode[];
   completedChecks: number;
   lastRunAt: string;
   isScanning: boolean;
@@ -19,6 +20,7 @@ type StatusOverviewProps = {
 
 export function StatusOverview({
   diagnosis,
+  liveNodes,
   completedChecks,
   lastRunAt,
   isScanning,
@@ -28,15 +30,24 @@ export function StatusOverview({
   scanActionReason,
   onRunScan
 }: StatusOverviewProps) {
+  const liveProblemNode = liveNodes.find(
+    (node) => node.status === "failed" || node.status === "warning"
+  );
   const isProblemState = !["info", "low"].includes(diagnosis.severity);
-  const statusHeadline = isProblemState ? "Problems detected" : "Connection looks healthy";
+  const shouldShowProblemState = isScanning ? Boolean(liveProblemNode) : isProblemState;
+  const severity = isScanning && liveProblemNode ? liveProblemNode.severity : diagnosis.severity;
+  const statusHeadline = shouldShowProblemState
+    ? isScanning && liveProblemNode
+      ? `${liveProblemNode.label} needs attention`
+      : "Problems detected"
+    : "Connection looks healthy";
   const severityBars = {
     info: 2,
     low: 3,
     medium: 4,
     high: 5,
     critical: 6
-  }[diagnosis.severity];
+  }[severity];
   const lastRunLabel = new Date(lastRunAt).toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit"
@@ -64,12 +75,12 @@ export function StatusOverview({
           <div
             className={cn(
               "relative grid h-[82px] w-[82px] shrink-0 place-items-center rounded-full border shadow-[0_0_44px_rgba(255,106,90,0.08)]",
-              isProblemState
+              shouldShowProblemState
                 ? "border-[#ff6a5a]/35 bg-[#ff6a5a]/[0.05] text-[#ff6a5a]"
                 : "border-[#54d786]/30 bg-[#54d786]/[0.05] text-[#54d786]"
             )}
           >
-            {isProblemState ? (
+            {shouldShowProblemState ? (
               <>
                 <Wifi className="h-10 w-10" strokeWidth={1.8} />
                 <span className="absolute bottom-1.5 right-1.5 grid h-7 w-7 place-items-center rounded-full border border-[#ff6a5a] bg-[#111c2c] text-[#ff6a5a] shadow-[0_0_24px_rgba(255,98,87,0.18)]">
@@ -83,11 +94,12 @@ export function StatusOverview({
 
           <div className="min-w-0">
             <h2 className="text-[1.7rem] font-semibold tracking-[-0.02em] text-white">
-              {isScanning ? "Running diagnostics" : statusHeadline}
+              {isScanning && !liveProblemNode ? "Running diagnostics" : statusHeadline}
             </h2>
             <p className="mt-1.5 max-w-[34rem] text-[0.97rem] leading-7 text-slate-300">
               {isScanning
-                ? scanProgress?.message ??
+                ? liveProblemNode?.summary ??
+                  scanProgress?.message ??
                   "Aegis is stepping through the connection chain live so the timeline follows the real scan."
                 : diagnosis.summary}
             </p>
@@ -100,10 +112,10 @@ export function StatusOverview({
             <p
               className={cn(
                 "text-[1.2rem] font-medium tracking-[-0.02em]",
-                isProblemState ? "text-[#ff6a5a]" : "text-[#54d786]"
+                shouldShowProblemState ? "text-[#ff6a5a]" : "text-[#54d786]"
               )}
             >
-              {severityLabels[diagnosis.severity]}
+              {severityLabels[severity]}
             </p>
             <div className="flex gap-1.5">
               {Array.from({ length: 8 }, (_, index) => (
@@ -112,7 +124,7 @@ export function StatusOverview({
                   className={cn(
                     "h-[7px] w-6 rounded-full xl:w-7",
                     index < severityBars
-                      ? isProblemState
+                      ? shouldShowProblemState
                         ? "bg-[#ff6257] shadow-[0_0_10px_rgba(255,98,87,0.16)]"
                         : "bg-[#54d786] shadow-[0_0_10px_rgba(84,215,134,0.14)]"
                       : "bg-[#263349]"

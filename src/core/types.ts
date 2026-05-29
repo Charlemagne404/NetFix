@@ -162,10 +162,12 @@ export type SystemMetrics = {
 
 export type ScanProgress = {
   runId: string;
-  kind: "scan-started" | "node-started" | "scan-finished";
+  kind: "scan-started" | "node-started" | "node-completed" | "scan-finished";
   nodeId?: string;
   nodeLabel?: string;
   nodeIndex?: number;
+  nodeStatus?: DiagnosticStatus;
+  nodeSummary?: string;
   totalNodes: number;
   message: string;
 };

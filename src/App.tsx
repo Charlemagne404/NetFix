@@ -372,6 +372,7 @@ export default function App() {
 
         <StatusOverview
           diagnosis={scanResult.diagnosis}
+          liveNodes={displayNodes}
           completedChecks={totalChecks}
           lastRunAt={scanResult.createdAt}
           isScanning={isScanning}
@@ -395,7 +396,7 @@ export default function App() {
 
         <div className="grid min-w-0 gap-3 lg:min-h-0 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
           <FindingsPanel
-            scan={scanResult}
+            nodes={displayNodes}
             selectedNodeId={selectedNode?.id}
             mode={mode}
             onSelectNode={setSelectedNodeId}

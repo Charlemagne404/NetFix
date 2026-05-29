@@ -1,10 +1,10 @@
 import { ChevronRight, Eye, TerminalSquare } from "lucide-react";
-import type { AppMode, DiagnosticNode, DiagnosticStatus, ScanResult } from "@/core/types";
+import type { AppMode, DiagnosticNode, DiagnosticStatus } from "@/core/types";
 import { StatusGlyph } from "@/components/common/IconMap";
 import { cn } from "@/utils/cn";
 
 type FindingsPanelProps = {
-  scan: ScanResult;
+  nodes: DiagnosticNode[];
   selectedNodeId?: string;
   mode: AppMode;
   onSelectNode: (nodeId: string) => void;
@@ -57,15 +57,15 @@ function rowTone(status: DiagnosticStatus) {
 }
 
 export function FindingsPanel({
-  scan,
+  nodes,
   selectedNodeId,
   mode,
   onSelectNode,
   onViewReport,
   onOpenTechnician
 }: FindingsPanelProps) {
-  const rows = getFindingRows(scan.nodes);
-  const selectedNode = rows.find((node) => node.id === selectedNodeId) ?? rows[0] ?? scan.nodes[0];
+  const rows = getFindingRows(nodes);
+  const selectedNode = rows.find((node) => node.id === selectedNodeId) ?? rows[0] ?? nodes[0];
 
   return (
     <section className="app-panel min-w-0 flex min-h-[18rem] flex-col rounded-[14px] lg:h-full lg:min-h-0">

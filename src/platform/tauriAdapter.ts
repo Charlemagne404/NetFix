@@ -1,6 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { createMockScanResult } from "@/core/mockData";
 import {
   createDegradedRuntimeHealth,
   createPreviewRuntimeHealth
@@ -27,6 +26,7 @@ import type {
   ScanResult,
   SystemMetrics
 } from "@/core/types";
+import { mockAdapter } from "./mockAdapter";
 import type { PlatformAdapter } from "./platformAdapter";
 
 export function hasTauriRuntime(): boolean {
@@ -167,12 +167,12 @@ export const tauriAdapter: PlatformAdapter = {
   kind: "tauri",
   async runScan({ scenarioId, runId, onProgress }) {
     if (!hasTauriRuntime()) {
-      return createMockScanResult(scenarioId);
+      return mockAdapter.runScan({ scenarioId, runId, onProgress });
     }
 
     const environment = await getResolvedEnvironmentInfo();
     if (!environment.isWindows) {
-      return createMockScanResult(scenarioId);
+      return mockAdapter.runScan({ scenarioId, runId, onProgress });
     }
 
     const unlisten = onProgress

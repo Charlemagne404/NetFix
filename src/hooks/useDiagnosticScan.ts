@@ -12,6 +12,13 @@ type UseDiagnosticScanInput = {
 
 const SCAN_TIMEOUT_MS = 150_000;
 
+function severityForStatus(status: DiagnosticNode["status"]): DiagnosticNode["severity"] {
+  if (status === "failed") return "high";
+  if (status === "warning") return "medium";
+  if (status === "unknown" || status === "skipped") return "low";
+  return "info";
+}
+
 function buildPendingNodes(nodes: DiagnosticNode[]): DiagnosticNode[] {
   return nodes.map((node) => ({
     ...node,
@@ -27,14 +34,11 @@ function buildPendingNodes(nodes: DiagnosticNode[]): DiagnosticNode[] {
   }));
 }
 
-function buildLiveNodes(
+function markNodeRunning(
   nodes: DiagnosticNode[],
   activeNodeId: string | undefined,
-  completedNodeIds: string[],
   activeMessage: string | undefined
 ): DiagnosticNode[] {
-  const completedNodeIdSet = new Set(completedNodeIds);
-
   return nodes.map((node) => {
     if (node.id === activeNodeId) {
       return {
@@ -46,24 +50,45 @@ function buildLiveNodes(
       };
     }
 
-    if (completedNodeIdSet.has(node.id)) {
+    if (node.progressState === "checked") {
+      return node;
+    }
+
+    if (node.progressState === "running") {
       return {
         ...node,
         status: "pending",
         severity: "info",
-        progressState: "checked",
-        summary: "Evidence collected. Waiting for the remaining checks..."
+        progressState: "queued",
+        summary: "Waiting for earlier checks..."
       };
     }
 
-    return {
-      ...node,
-      status: "pending",
-      severity: "info",
-      progressState: "queued",
-      summary: "Waiting for earlier checks..."
-    };
+    return node;
   });
+}
+
+function applyNodeCompletion(
+  nodes: DiagnosticNode[],
+  progress: ScanProgress
+): DiagnosticNode[] {
+  if (!progress.nodeId || !progress.nodeStatus) {
+    return nodes;
+  }
+
+  const nodeStatus = progress.nodeStatus;
+
+  return nodes.map((node) =>
+    node.id === progress.nodeId
+      ? {
+          ...node,
+          status: nodeStatus,
+          severity: severityForStatus(nodeStatus),
+          progressState: "checked",
+          summary: progress.nodeSummary ?? node.summary
+        }
+      : node
+  );
 }
 
 function createScanRunId() {
@@ -101,17 +126,6 @@ export function useDiagnosticScan({
     setCompletedNodeIds([]);
     setScanProgress(undefined);
   }, []);
-
-  const syncLiveNodes = useCallback((message?: string) => {
-    setDisplayNodes((currentNodes) =>
-      buildLiveNodes(
-        currentNodes,
-        activeNodeIdRef.current,
-        completedNodeIdsRef.current,
-        message ?? scanProgress?.message
-      )
-    );
-  }, [scanProgress?.message]);
 
   const loadScan = useCallback((nextScan: ScanResult) => {
     runIdRef.current += 1;
@@ -151,22 +165,30 @@ export function useDiagnosticScan({
               setScanProgress(progress);
 
               if (progress.kind === "node-started") {
-                if (activeNodeIdRef.current && activeNodeIdRef.current !== progress.nodeId) {
-                  completedNodeIdsRef.current = [
-                    ...completedNodeIdsRef.current,
-                    activeNodeIdRef.current
-                  ];
+                activeNodeIdRef.current = progress.nodeId;
+                setActiveNodeId(progress.nodeId);
+                setDisplayNodes((currentNodes) =>
+                  markNodeRunning(currentNodes, progress.nodeId, progress.message)
+                );
+                return;
+              }
+
+              if (progress.kind === "node-completed") {
+                if (progress.nodeId && !completedNodeIdsRef.current.includes(progress.nodeId)) {
+                  completedNodeIdsRef.current = [...completedNodeIdsRef.current, progress.nodeId];
                   setCompletedNodeIds(completedNodeIdsRef.current);
                 }
 
-                activeNodeIdRef.current = progress.nodeId;
-                setActiveNodeId(progress.nodeId);
-                syncLiveNodes(progress.message);
+                setDisplayNodes((currentNodes) => applyNodeCompletion(currentNodes, progress));
                 return;
               }
 
               if (progress.kind === "scan-finished") {
-                syncLiveNodes(progress.message);
+                setDisplayNodes((currentNodes) =>
+                  activeNodeIdRef.current
+                    ? markNodeRunning(currentNodes, activeNodeIdRef.current, progress.message)
+                    : currentNodes
+                );
               }
             }
           }),
@@ -203,7 +225,7 @@ export function useDiagnosticScan({
       onScanComplete?.(finalScan);
       return finalScan;
     },
-    [adapter, onScanComplete, resetLiveState, syncLiveNodes]
+    [adapter, onScanComplete, resetLiveState]
   );
 
   return {

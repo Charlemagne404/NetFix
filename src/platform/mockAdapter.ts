@@ -18,6 +18,8 @@ const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve,
 export const mockAdapter: PlatformAdapter = {
   kind: "mock",
   async runScan({ scenarioId, runId, onProgress }) {
+    const finalScan = createMockScanResult(scenarioId);
+
     onProgress?.({
       runId,
       kind: "scan-started",
@@ -25,7 +27,7 @@ export const mockAdapter: PlatformAdapter = {
       message: "Preparing the diagnostic timeline..."
     });
 
-    for (const [index, node] of TIMELINE_DEFINITION.entries()) {
+    for (const [index, node] of finalScan.nodes.entries()) {
       onProgress?.({
         runId,
         kind: "node-started",
@@ -36,6 +38,17 @@ export const mockAdapter: PlatformAdapter = {
         message: `Checking ${node.label.toLowerCase()} in the live timeline...`
       });
       await wait(260);
+      onProgress?.({
+        runId,
+        kind: "node-completed",
+        nodeId: node.id,
+        nodeLabel: node.label,
+        nodeIndex: index,
+        nodeStatus: node.status,
+        nodeSummary: node.summary,
+        totalNodes: TIMELINE_DEFINITION.length,
+        message: node.summary
+      });
     }
 
     await wait(120);
@@ -46,7 +59,7 @@ export const mockAdapter: PlatformAdapter = {
       message: "Finalizing the diagnosis..."
     });
 
-    return createMockScanResult(scenarioId);
+    return finalScan;
   },
   async runFix(fix, confirmation) {
     if (!isAllowlistedFixId(fix.id)) {
