@@ -1,4 +1,4 @@
-import { ArrowRight, RotateCcw } from "lucide-react";
+import { ArrowRight, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react";
 import type {
   FixAction,
   FixExecutionResult,
@@ -18,7 +18,6 @@ type RepairPlanPanelProps = {
   onOpenAdvancedOptions: () => void;
   onRunFix: (fix: FixAction) => void;
   onRunScan: () => void;
-  onViewReport: () => void;
 };
 
 function actionLabel(fix: FixAction) {
@@ -41,28 +40,27 @@ export function RepairPlanPanel({
   scanActionReason,
   onOpenAdvancedOptions,
   onRunFix,
-  onRunScan,
-  onViewReport
+  onRunScan
 }: RepairPlanPanelProps) {
   const steps = diagnosis.recommendedFixes.slice(0, 4);
 
   return (
-    <section className="app-panel min-w-0 flex min-h-[18rem] flex-col rounded-[14px] lg:h-full lg:min-h-0">
-      <div className="border-b border-[color:var(--aegis-line-soft)] px-6 py-5">
+    <section className="app-panel min-w-0 flex h-full min-h-0 flex-col rounded-[14px]">
+      <div className="border-b border-[color:var(--aegis-line-soft)] px-6 py-3.5">
         <h2 className="text-[1.02rem] font-semibold tracking-[0.01em] text-white">How to fix it</h2>
         <p className="mt-1 text-[0.92rem] leading-6 text-slate-400">
           Follow the lowest-risk steps first. Every action here is tied to the evidence above.
         </p>
       </div>
 
-      <div className="hide-scrollbar min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-5">
+      <div className="min-h-0 flex-1 px-4 py-3 sm:px-5">
         {steps.length ? (
           <div className="overflow-hidden rounded-[14px] border border-[color:var(--aegis-line-soft)] bg-[linear-gradient(180deg,rgba(15,24,36,0.88)_0%,rgba(11,20,31,0.94)_100%)] shadow-[inset_0_1px_0_rgba(170,192,224,0.02)]">
             {steps.map((fix, index) => (
               <article
                 key={fix.id}
                 className={cn(
-                  "flex flex-col gap-3 px-4 py-2.5 sm:px-5 lg:flex-row lg:items-center",
+                  "flex flex-col gap-2 px-4 py-1.5 sm:px-5 lg:flex-row lg:items-center",
                   index !== steps.length - 1 && "border-b border-[color:var(--aegis-line-soft)]"
                 )}
               >
@@ -107,11 +105,7 @@ export function RepairPlanPanel({
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[color:var(--aegis-line-soft)] px-1 pt-4">
-          {!fixesEnabled ? (
-            <p className="basis-full text-sm leading-6 text-amber-100/85">{fixesDisabledReason}</p>
-          ) : null}
-
+        <div className="mt-3 px-1">
           <button
             type="button"
             onClick={onOpenAdvancedOptions}
@@ -120,7 +114,16 @@ export function RepairPlanPanel({
             View advanced options
             <ArrowRight className="h-4 w-4" />
           </button>
+        </div>
 
+        {fixResult ? (
+          <div className="mt-3 rounded-[14px] border border-[#4b8dff]/22 bg-[#4b8dff]/[0.08] px-4 py-3">
+            <p className="font-medium text-white">{fixResult.title}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{fixResult.message}</p>
+          </div>
+        ) : null}
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-4 border-t border-[color:var(--aegis-line-soft)] px-1 pt-3">
           <button
             type="button"
             onClick={onRunScan}
@@ -129,24 +132,21 @@ export function RepairPlanPanel({
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-300 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RotateCcw className="h-4 w-4" />
-            {isScanning ? "Re-running scan" : "Re-run scan"}
+            {isScanning ? "Re-running tests" : "Re-run tests"}
           </button>
 
-          <button
-            type="button"
-            onClick={onViewReport}
-            className="text-sm font-medium text-slate-400 transition hover:text-white"
-          >
-            Open report
-          </button>
-        </div>
-
-        {fixResult ? (
-          <div className="mt-4 rounded-[16px] border border-[#4b8dff]/25 bg-[#4b8dff]/[0.08] px-4 py-3">
-            <p className="font-medium text-white">{fixResult.title}</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{fixResult.message}</p>
+          <div className="flex items-center gap-3 text-sm text-slate-500">
+            <span>Was this helpful?</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-full border border-white/[0.07] bg-white/[0.02] text-slate-400">
+                <ThumbsUp className="h-4 w-4" />
+              </span>
+              <span className="grid h-8 w-8 place-items-center rounded-full border border-white/[0.07] bg-white/[0.02] text-slate-400">
+                <ThumbsDown className="h-4 w-4" />
+              </span>
+            </span>
           </div>
-        ) : null}
+        </div>
       </div>
     </section>
   );

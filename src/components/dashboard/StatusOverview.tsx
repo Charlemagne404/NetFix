@@ -60,21 +60,33 @@ export function StatusOverview({
   const progressLabel = stageNumber
     ? `Stage ${stageNumber} of ${totalTimelineNodes}`
     : `Preparing ${totalTimelineNodes}-stage timeline`;
+  const progressPercent =
+    isScanning && totalTimelineNodes > 0
+      ? Math.min(
+          100,
+          Math.max(
+            8,
+            ((typeof scanProgress?.nodeIndex === "number" ? scanProgress.nodeIndex + 1 : 0) /
+              totalTimelineNodes) *
+              100
+          )
+        )
+      : 100;
 
   return (
     <motion.section
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
-      className="app-panel relative min-w-0 overflow-hidden rounded-[14px] px-5 py-4"
+      className="app-panel relative min-w-0 overflow-hidden rounded-[14px] px-5 py-3.5"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_0%,rgba(255,103,86,0.08),transparent_24%),radial-gradient(circle_at_100%_0%,rgba(49,116,255,0.06),transparent_28%)]" />
 
-      <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1.58fr)_minmax(0,0.8fr)_minmax(0,0.95fr)_minmax(248px,0.9fr)] xl:items-center">
-        <div className="flex min-w-0 items-center gap-4">
+      <div className="relative grid gap-4 xl:grid-cols-2 2xl:grid-cols-[minmax(0,1.58fr)_minmax(260px,0.84fr)_minmax(300px,1fr)_minmax(248px,0.9fr)] 2xl:items-center">
+        <div className="flex min-w-0 items-center gap-4 xl:col-span-2 2xl:col-span-1">
           <div
             className={cn(
-              "relative grid h-[82px] w-[82px] shrink-0 place-items-center rounded-full border shadow-[0_0_44px_rgba(255,106,90,0.08)]",
+              "relative grid h-[74px] w-[74px] shrink-0 place-items-center rounded-full border shadow-[0_0_44px_rgba(255,106,90,0.08)]",
               shouldShowProblemState
                 ? "border-[#ff6a5a]/35 bg-[#ff6a5a]/[0.05] text-[#ff6a5a]"
                 : "border-[#54d786]/30 bg-[#54d786]/[0.05] text-[#54d786]"
@@ -82,21 +94,21 @@ export function StatusOverview({
           >
             {shouldShowProblemState ? (
               <>
-                <Wifi className="h-10 w-10" strokeWidth={1.8} />
-                <span className="absolute bottom-1.5 right-1.5 grid h-7 w-7 place-items-center rounded-full border border-[#ff6a5a] bg-[#111c2c] text-[#ff6a5a] shadow-[0_0_24px_rgba(255,98,87,0.18)]">
+                <Wifi className="h-9 w-9" strokeWidth={1.8} />
+                <span className="absolute bottom-1.5 right-1.5 grid h-6 w-6 place-items-center rounded-full border border-[#ff6a5a] bg-[#111c2c] text-[#ff6a5a] shadow-[0_0_24px_rgba(255,98,87,0.18)]">
                   <AlertCircle className="h-4 w-4" strokeWidth={2} />
                 </span>
               </>
             ) : (
-              <Wifi className="h-10 w-10" strokeWidth={1.8} />
+              <Wifi className="h-9 w-9" strokeWidth={1.8} />
             )}
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-[1.7rem] font-semibold tracking-[-0.02em] text-white">
+            <h2 className="text-[1.55rem] font-semibold tracking-[-0.02em] text-white">
               {isScanning && !liveProblemNode ? "Running diagnostics" : statusHeadline}
             </h2>
-            <p className="mt-1.5 max-w-[34rem] text-[0.97rem] leading-7 text-slate-300">
+            <p className="mt-1.5 max-w-[34rem] text-[0.95rem] leading-6 text-slate-300">
               {isScanning
                 ? liveProblemNode?.summary ??
                   scanProgress?.message ??
@@ -106,9 +118,9 @@ export function StatusOverview({
           </div>
         </div>
 
-        <div className="border-[color:var(--aegis-line)] xl:border-l xl:pl-8">
+        <div className="border-[color:var(--aegis-line)] xl:border-t xl:pt-4 2xl:border-l 2xl:border-t-0 2xl:pl-8 2xl:pt-0">
           <p className="text-[0.96rem] text-slate-400">Severity</p>
-          <div className="mt-3 flex items-center gap-4">
+          <div className="mt-3 space-y-3">
             <p
               className={cn(
                 "text-[1.2rem] font-medium tracking-[-0.02em]",
@@ -117,7 +129,7 @@ export function StatusOverview({
             >
               {severityLabels[severity]}
             </p>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {Array.from({ length: 8 }, (_, index) => (
                 <span
                   key={index}
@@ -135,10 +147,20 @@ export function StatusOverview({
           </div>
         </div>
 
-        <div className="border-[color:var(--aegis-line)] xl:border-l xl:pl-8">
+        <div className="border-[color:var(--aegis-line)] xl:border-t xl:pt-4 2xl:border-l 2xl:border-t-0 2xl:pl-8 2xl:pt-0">
           <p className="text-[0.96rem] text-slate-400">
             {isScanning ? "Live progress" : "Diagnostics completed"}
           </p>
+          {isScanning ? (
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#223047]">
+              <motion.div
+                className="h-full rounded-full bg-[linear-gradient(90deg,#38bdf8_0%,#4b8dff_52%,#54d786_100%)] shadow-[0_0_16px_rgba(75,141,255,0.22)]"
+                initial={false}
+                animate={{ width: `${progressPercent}%` }}
+                transition={{ duration: 0.28, ease: "easeOut" }}
+              />
+            </div>
+          ) : null}
           <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.98rem] text-slate-200">
             {isScanning ? (
               <>
@@ -156,7 +178,7 @@ export function StatusOverview({
           </div>
         </div>
 
-        <div className="xl:justify-self-end">
+        <div className="xl:border-t xl:pt-4 2xl:justify-self-end 2xl:border-t-0 2xl:pt-0">
           <p className="text-right text-[0.92rem] text-slate-400">Last run: Today, {lastRunLabel}</p>
           <button
             type="button"

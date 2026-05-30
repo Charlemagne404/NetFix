@@ -2,7 +2,9 @@ import {
   Activity,
   ArrowDown,
   ArrowUp,
+  ChevronDown,
   FileText,
+  Globe,
   HardDrive,
   History,
   Home,
@@ -22,7 +24,6 @@ import type {
   ThemeMode,
   WorkspaceMode
 } from "@/core/types";
-import { ModeToggle } from "@/components/settings/ModeToggle";
 import { cn } from "@/utils/cn";
 
 type FooterMetrics = {
@@ -57,6 +58,16 @@ type AppShellProps = {
   onExportReport: () => void;
   onOpenSettings: () => void;
 };
+
+function getNodeEvidenceValue(
+  scan: ScanResult,
+  nodeId: string,
+  evidenceId: string
+) {
+  return scan.nodes
+    .find((node) => node.id === nodeId)
+    ?.evidence.find((item) => item.id === evidenceId)?.value;
+}
 
 function formatUptime(seconds: number | null) {
   if (seconds === null || !Number.isFinite(seconds)) {
@@ -197,43 +208,51 @@ export function AppShell({
   const footerStatusLabel = footerMetrics.source === "system" ? "Live metrics" : "Browser metrics";
   const footerStatusDotClassName =
     footerMetrics.source === "system" ? "bg-[#54d786]" : "bg-[#f2b84b]";
+  const technicianModeEnabled = mode === "technician";
 
   const navItems = [
     {
       label: "Overview",
-      description: "Current diagnosis, confidence, and scan controls.",
       icon: Home,
+      active: false
+    },
+    {
+      label: "Diagnosis",
+      icon: Stethoscope,
       active: true
     },
     {
-      label: "Timeline",
-      description: "Trace the connection chain from device to app layer.",
-      icon: Stethoscope
-    },
-    {
-      label: "Findings",
-      description: "Review evidence, likely causes, and user-facing impact.",
+      label: "Connectivity Tests",
       icon: Activity
     },
     {
-      label: "Repair Plan",
-      description: "Follow the safest allowlisted fixes first.",
-      icon: Wrench
+      label: "Wi-Fi Advisor",
+      icon: Wifi
     },
     {
-      label: "Verification",
-      description: "Compare before and after scans to confirm improvement.",
-      icon: Shield
+      label: "DNS Toolkit",
+      icon: Globe
     },
     {
-      label: "Local Reports",
-      description: "Export a case file that stays on this device.",
+      label: "Traffic Monitor",
+      icon: Activity
+    },
+    {
+      label: "System Insights",
+      icon: History
+    },
+    {
+      label: "Reports",
       icon: FileText
     },
     {
-      label: "Scan History",
-      description: "Restore previous timelines and repair outcomes.",
-      icon: History
+      label: "Tools",
+      icon: Wrench,
+      hasDisclosure: true
+    },
+    {
+      label: "Settings",
+      icon: Settings
     }
   ];
 
@@ -267,6 +286,24 @@ export function AppShell({
       dotClassName: "bg-[#63a5ff]"
     }
   }[workspaceMode];
+  const hostnameDisplay =
+    environmentInfo.hostname ??
+    scan.environment.hostname ??
+    workspaceSummary.title ??
+    "Windows desktop";
+
+  const adapterName =
+    getNodeEvidenceValue(scan, "adapter", "adapter") ??
+    hostnameDisplay ??
+    "Windows desktop";
+  const networkName = getNodeEvidenceValue(scan, "wifi", "ssid");
+  const wifiSignal = getNodeEvidenceValue(scan, "wifi", "signal");
+  const ipAddress = getNodeEvidenceValue(scan, "ip", "ipv4");
+  const sidebarConnectionLabel = networkName
+    ? `Connected to ${networkName}`
+    : workspaceSummary.description;
+  const sidebarPrimaryMetric = wifiSignal ?? workspaceSummary.badge;
+  const sidebarSecondaryMetric = ipAddress ?? environmentInfo.os;
 
   return (
     <div
@@ -277,112 +314,114 @@ export function AppShell({
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(31,110,255,0.12),transparent_24%),radial-gradient(circle_at_70%_0%,rgba(72,132,255,0.07),transparent_20%),linear-gradient(180deg,#09111b_0%,#0b1220_100%)]" />
 
       <div className="relative mx-auto h-full max-w-[1680px] overflow-hidden">
-        <div className="grid h-full lg:grid-cols-[248px_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)_auto]">
-          <aside className="min-h-0 border-b border-[color:var(--aegis-line)] bg-[#09111c]/92 px-3 py-4 lg:row-span-2 lg:flex lg:flex-col lg:overflow-hidden lg:border-b-0 lg:border-r">
+        <div className="grid h-full lg:grid-cols-[260px_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)_auto]">
+          <aside className="min-h-0 border-b border-[color:var(--aegis-line)] bg-[linear-gradient(180deg,rgba(9,16,28,0.98)_0%,rgba(7,14,24,0.98)_100%)] px-3 py-5 lg:row-span-2 lg:flex lg:flex-col lg:overflow-hidden lg:border-b-0 lg:border-r lg:px-3.5 lg:py-6">
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center gap-4 px-3 pb-5">
-                <div className="grid h-12 w-12 place-items-center rounded-[18px] border border-[#1f66d8]/30 bg-[linear-gradient(180deg,rgba(19,38,69,0.92)_0%,rgba(10,22,40,0.98)_100%)] text-[#63a5ff] shadow-[0_0_30px_rgba(75,141,255,0.14)]">
+              <div className="flex items-center gap-3 px-3 pb-5 pt-1">
+                <div className="grid h-12 w-12 place-items-center rounded-[18px] border border-[#2f7dff]/26 bg-[radial-gradient(circle_at_50%_35%,rgba(52,120,255,0.18),transparent_62%),linear-gradient(180deg,rgba(12,27,45,0.98)_0%,rgba(8,17,30,0.98)_100%)] text-[#5ba1ff] shadow-[0_0_26px_rgba(47,125,255,0.12)]">
                   <Shield className="h-6 w-6" strokeWidth={1.7} />
                 </div>
-                <div>
-                  <h1 className="text-[1.02rem] font-semibold tracking-[0.01em] text-white">Aegis</h1>
-                  <p className="mt-0.5 text-[0.98rem] text-slate-300">Trace</p>
+                <div className="min-w-0">
+                  <p className="truncate text-[1.02rem] font-semibold tracking-[0.01em] text-white">
+                    AEGIS-DESKTOP
+                  </p>
+                  <p className="mt-0.5 text-[0.98rem] tracking-[0.01em] text-slate-300">
+                    Aegis Trace
+                  </p>
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between rounded-[14px] border border-[color:var(--aegis-line-soft)] bg-[rgba(20,30,45,0.68)] px-4 py-3 lg:hidden">
-                <div>
-                  <p className="text-sm text-slate-400">Workspace</p>
-                  <p className="text-[1.02rem] font-medium text-white">Diagnosis</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onModeChange(mode === "technician" ? "normal" : "technician")}
-                  className={cn(
-                    "relative h-7 w-12 rounded-full transition",
-                    mode === "technician" ? "bg-[#2f7dff]" : "bg-[#253042]"
-                  )}
-                  aria-pressed={mode === "technician"}
-                >
-                  <span
-                    className={cn(
-                      "absolute top-1 h-5 w-5 rounded-full bg-white transition",
-                      mode === "technician" ? "left-6" : "left-1"
-                    )}
-                  />
-                </button>
-              </div>
+              <div className="mx-1 h-px bg-[linear-gradient(90deg,transparent_0%,rgba(110,133,166,0.2)_8%,rgba(110,133,166,0.2)_92%,transparent_100%)]" />
 
-              <nav className="hide-scrollbar mt-2 hidden min-h-0 flex-1 space-y-2 overflow-y-auto border-t border-[color:var(--aegis-line-soft)] pt-4 lg:block">
-                {navItems.map(({ label, description, icon: Icon, active }) => (
-                  <div
-                    key={label}
-                    className={cn(
-                      "rounded-[14px] border px-4 py-3",
-                      active
-                        ? "border-[rgba(78,122,191,0.28)] bg-[rgba(20,32,49,0.74)] shadow-[inset_2px_0_0_#2f7dff]"
-                        : "border-[color:var(--aegis-line-soft)] bg-[rgba(10,18,29,0.44)]"
-                    )}
-                  >
-                    <div className="flex items-center gap-3 text-white">
-                      <Icon className="h-4.5 w-4.5 text-slate-300" strokeWidth={1.8} />
-                      <span className="text-[0.95rem] font-medium">{label}</span>
+              <nav className="hide-scrollbar mt-4 hidden min-h-0 flex-1 overflow-y-auto lg:block">
+                <div className="space-y-1">
+                  {navItems.map(({ label, icon: Icon, active, hasDisclosure }) => (
+                    <div
+                      key={label}
+                      className={cn(
+                        "group relative flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-slate-300 transition",
+                        active
+                          ? "bg-[linear-gradient(180deg,rgba(23,35,53,0.92)_0%,rgba(18,29,44,0.9)_100%)] text-white shadow-[inset_2px_0_0_#2f7dff]"
+                          : "hover:bg-white/[0.02] hover:text-white"
+                      )}
+                    >
+                      {active ? (
+                        <span className="absolute inset-y-[9px] left-0 w-px rounded-full bg-[#2f7dff]" />
+                      ) : null}
+                      <span
+                        className={cn(
+                          "flex h-7 w-7 items-center justify-center rounded-[10px] transition",
+                          active
+                            ? "text-[#dce8fb]"
+                            : "text-slate-400 group-hover:text-slate-200"
+                        )}
+                      >
+                        <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
+                      </span>
+                      <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                        <span className="truncate text-[0.95rem] font-medium tracking-[0.01em]">
+                          {label}
+                        </span>
+                        {hasDisclosure ? (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                        ) : null}
+                      </span>
                     </div>
-                    <p className="mt-2 text-[0.82rem] leading-5 text-slate-400">{description}</p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </nav>
             </div>
 
-            <div className="app-panel-soft mt-4 hidden rounded-[14px] px-4 py-3.5 lg:block">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 text-slate-200">
-                  <Wifi className="h-5 w-5 text-slate-300" />
-                  <div>
-                    <p className="text-[0.96rem] font-medium">{workspaceSummary.title}</p>
-                    <p className="text-sm text-slate-400">{workspaceSummary.description}</p>
+            <div className="mt-4 hidden rounded-[12px] border border-[rgba(104,127,160,0.12)] bg-[linear-gradient(180deg,rgba(18,29,44,0.92)_0%,rgba(11,19,30,0.98)_100%)] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(170,192,224,0.03),0_14px_28px_rgba(0,0,0,0.16)] lg:block">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-[14px] border border-white/[0.05] bg-[rgba(14,24,38,0.9)] text-slate-300">
+                  <Wifi className="h-4.5 w-4.5" strokeWidth={1.8} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[0.95rem] font-medium tracking-[0.01em] text-slate-100">
+                    {adapterName}
+                  </p>
+                  <p className="mt-1 text-[0.9rem] leading-5 text-slate-300">
+                    {sidebarConnectionLabel}
+                  </p>
+
+                  <div className="mt-2.5 flex items-center gap-3 text-[0.84rem] text-slate-400">
+                    <span>{sidebarPrimaryMetric}</span>
+                    <span className="h-1 w-1 rounded-full bg-slate-600" />
+                    <span className="truncate">{sidebarSecondaryMetric}</span>
                   </div>
                 </div>
-                <span className={cn("h-2.5 w-2.5 rounded-full", workspaceSummary.dotClassName)} />
-              </div>
-              <div className="mt-3 flex items-center gap-4 text-sm text-slate-300">
-                <span className={workspaceSummary.accentClassName}>{workspaceSummary.badge}</span>
-                <span>{environmentInfo.os}</span>
-                {environmentInfo.isAdmin ? <span>Elevated</span> : <span>Standard access</span>}
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <span className="text-[0.96rem] text-slate-200">Technician Mode</span>
+              <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-white/[0.06] pt-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-5 w-5 place-items-center rounded-full border border-[#54d786]/45 bg-[#54d786]/10 text-[#54d786]">
+                    <span className="h-2 w-2 rounded-full bg-current" />
+                  </span>
+                  <span className="text-[0.98rem] font-medium text-slate-100">
+                    Technician Mode
+                  </span>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => onModeChange(mode === "technician" ? "normal" : "technician")}
+                  onClick={() => onModeChange(technicianModeEnabled ? "normal" : "technician")}
                   className={cn(
-                    "relative h-7 w-12 rounded-full transition",
-                    mode === "technician" ? "bg-[#2f7dff]" : "bg-[#253042]"
+                    "relative h-6.5 w-12 rounded-full border transition",
+                    technicianModeEnabled
+                      ? "border-[#2f7dff]/70 bg-[linear-gradient(180deg,#3b8dff_0%,#2f7dff_100%)] shadow-[0_0_18px_rgba(47,125,255,0.18)]"
+                      : "border-white/[0.08] bg-[#1b2737]"
                   )}
-                  aria-pressed={mode === "technician"}
+                  aria-label="Toggle technician mode"
+                  aria-pressed={technicianModeEnabled}
                 >
                   <span
                     className={cn(
-                      "absolute top-1 h-5 w-5 rounded-full bg-white transition",
-                      mode === "technician" ? "left-6" : "left-1"
+                      "absolute top-[2px] h-5 w-5 rounded-full bg-white transition",
+                      technicianModeEnabled ? "left-[25px]" : "left-[2px]"
                     )}
                   />
                 </button>
-              </div>
-
-              <div className="mt-4 rounded-[12px] border border-[color:var(--aegis-line-soft)] bg-black/10 px-3.5 py-3">
-                <p className="text-[0.82rem] uppercase tracking-[0.14em] text-slate-500">
-                  Timeline focus
-                </p>
-                <p className="mt-2 text-[0.95rem] font-medium text-white">
-                  {scan.diagnosis.primaryFailedNodeId
-                    ? "The current workspace is centered on the first failed stage."
-                    : "The timeline completed without a failed stage."}
-                </p>
-                <p className="mt-1 text-sm leading-6 text-slate-400">
-                  Aegis keeps the break point obvious first, then opens deeper evidence for technician review.
-                </p>
               </div>
             </div>
           </aside>
@@ -394,10 +433,10 @@ export function AppShell({
                   <LaptopMinimal className="h-5 w-5" strokeWidth={1.8} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[13px] text-slate-500">System</p>
+                  <p className="text-[13px] text-slate-500">Current device</p>
                   <div className="flex items-center gap-2">
                     <p className="truncate text-[1.04rem] font-medium tracking-[0.01em] text-white">
-                      {scan.environment.hostname ?? "DESKTOP-AEGIS"}
+                      {hostnameDisplay}
                     </p>
                     <span className={cn("h-1.5 w-1.5 rounded-full", workspaceSummary.dotClassName)} />
                     <p className="truncate text-[0.92rem] text-slate-400">{workspaceSummary.badge}</p>
@@ -406,7 +445,6 @@ export function AppShell({
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5 xl:justify-end">
-                <ModeToggle mode={mode} onChange={onModeChange} />
                 <button
                   type="button"
                   onClick={onRunScan}
@@ -437,14 +475,16 @@ export function AppShell({
             </div>
           </header>
 
-          <main className="hide-scrollbar min-h-0 min-w-0 overscroll-contain overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-4 lg:px-6 lg:py-3">
+          <main className="min-h-0 min-w-0 overflow-hidden px-3 py-2 sm:px-4 lg:px-6 lg:py-2">
             {children}
           </main>
 
           <footer className="min-w-0 shrink-0 overflow-hidden border-t border-[color:var(--aegis-line)] bg-[linear-gradient(180deg,rgba(12,18,29,0.98)_0%,rgba(8,15,25,0.98)_100%)] px-4 sm:px-6 lg:col-span-2">
             <div className="hide-scrollbar flex min-h-[54px] items-center overflow-x-auto text-[0.89rem] text-slate-300 2xl:grid 2xl:grid-cols-[1.35fr_1.15fr_1fr_1fr_1.1fr_1.7fr_1.15fr] 2xl:overflow-visible">
-              <FooterSegment className="min-w-[164px] 2xl:min-w-0">
-                <span className="font-normal tracking-[0.01em] text-slate-300">Aegis Trace</span>
+              <FooterSegment className="min-w-[220px] 2xl:min-w-0">
+                <span className="font-normal tracking-[0.01em] text-slate-300">
+                  Aegis Trace
+                </span>
               </FooterSegment>
 
               <FooterSegment className="min-w-[150px] 2xl:min-w-0">

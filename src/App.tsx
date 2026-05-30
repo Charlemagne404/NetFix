@@ -2,13 +2,10 @@ import { useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { AnimatePresence } from "framer-motion";
 import { AppShell } from "@/components/layout/AppShell";
 import { FindingsPanel } from "@/components/dashboard/FindingsPanel";
-import { RecentScans } from "@/components/dashboard/RecentScans";
 import { StatusOverview } from "@/components/dashboard/StatusOverview";
 import { DiagnosticTimeline } from "@/components/timeline/DiagnosticTimeline";
-import { DetailsPanel } from "@/components/details/DetailsPanel";
 import { ConfirmFixModal } from "@/components/fixes/ConfirmFixModal";
 import { RepairPlanPanel } from "@/components/fixes/RepairPlanPanel";
-import { RepairVerificationPanel } from "@/components/fixes/RepairVerificationPanel";
 import { ReportPreview } from "@/components/reports/ReportPreview";
 import { RuntimeNotice } from "@/components/runtime/RuntimeNotice";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
@@ -367,7 +364,7 @@ export default function App() {
       onExportReport={() => setReportOpen(true)}
       onOpenSettings={() => setSettingsOpen(true)}
     >
-      <div className="grid min-w-0 gap-3 lg:min-h-full lg:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
+      <div className="dashboard-viewport grid h-full min-h-0 min-w-0 gap-2 lg:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
         <RuntimeNotice runtimeHealth={runtimeHealth} scanError={scanError} />
 
         <StatusOverview
@@ -394,14 +391,12 @@ export default function App() {
           isScanning={isScanning}
         />
 
-        <div className="grid min-w-0 gap-3 lg:min-h-0 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
+        <div className="grid min-w-0 gap-2 lg:min-h-0 lg:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
           <FindingsPanel
             nodes={displayNodes}
             selectedNodeId={selectedNode?.id}
-            mode={mode}
             onSelectNode={setSelectedNodeId}
-            onViewReport={() => setReportOpen(true)}
-            onOpenTechnician={() => setMode("technician")}
+            onViewDetails={() => setReportOpen(true)}
           />
 
           <RepairPlanPanel
@@ -415,36 +410,8 @@ export default function App() {
             onOpenAdvancedOptions={() => setSettingsOpen(true)}
             onRunFix={setPendingFix}
             onRunScan={handleRunScan}
-            onViewReport={() => setReportOpen(true)}
           />
         </div>
-
-        {selectedNode ? (
-          <div className="grid min-w-0 gap-3 overflow-hidden lg:min-h-0 lg:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
-            <DetailsPanel
-              node={selectedNode}
-              mode={mode}
-              fixesEnabled={canRunFixes}
-              fixesDisabledReason={fixDisabledReason}
-              onRunFix={setPendingFix}
-            />
-
-            <div className="grid min-w-0 gap-3 content-start lg:min-h-0 lg:grid-rows-[auto_minmax(0,1fr)]">
-              <RepairVerificationPanel
-                verification={repairVerification}
-                fixResult={fixResult}
-                isVerifying={isVerifyingFix}
-              />
-
-              <RecentScans
-                entries={scanHistory}
-                activeScanId={scanResult.id}
-                onSelectScan={handleSelectHistoryEntry}
-                onClearHistory={() => setScanHistory([])}
-              />
-            </div>
-          </div>
-        ) : null}
       </div>
 
       <AnimatePresence>

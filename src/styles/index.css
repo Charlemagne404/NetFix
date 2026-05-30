@@ -268,3 +268,15 @@ input:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+@media (max-height: 880px) {
+  .dashboard-viewport {
+    zoom: 0.92;
+  }
+}
+
+@media (max-height: 780px) {
+  .dashboard-viewport {
+    zoom: 0.78;
+  }
+}

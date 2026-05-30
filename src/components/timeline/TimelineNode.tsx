@@ -155,7 +155,7 @@ export function TimelineNode({
       animate={{
         opacity: shouldDim ? 0.56 : node.status === "pending" ? 0.84 : 1,
         y: active ? -1 : 0,
-        scale: selected ? 1.01 : 1
+        scale: 1
       }}
       transition={{ delay: index * 0.035, duration: 0.32, ease: "easeOut" }}
       whileHover={{ y: -2 }}

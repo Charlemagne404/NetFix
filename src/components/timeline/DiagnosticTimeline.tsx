@@ -58,11 +58,11 @@ export function DiagnosticTimeline({
   const completedNodeIdSet = new Set(completedNodeIds);
 
   return (
-    <section className="app-panel min-w-0 rounded-[14px] px-4 py-4 sm:px-5 sm:py-5">
-      <div className="relative overflow-x-auto overflow-y-hidden pb-1">
+    <section className="app-panel min-w-0 rounded-[14px] px-4 py-3.5 sm:px-5 sm:py-4">
+      <div className="hide-scrollbar relative overflow-x-auto overflow-y-hidden pb-1">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-full bg-[radial-gradient(circle_at_50%_0%,rgba(77,134,223,0.06),transparent_38%)]" />
 
-        <div className="relative min-w-[760px] xl:min-w-0">
+        <div className="relative min-w-[760px] px-2 xl:min-w-0">
           <div className="pointer-events-none absolute left-[5%] right-[5%] top-[4.72rem]">
             <div className="grid grid-cols-9 gap-0">
               {nodes.slice(0, -1).map((node, index) => {
@@ -127,14 +127,7 @@ export function DiagnosticTimeline({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[13px] text-slate-400">
-        <span className="text-slate-500">
-          {isScanning
-            ? scanProgress?.message ??
-              "Aegis is moving through the connection chain live as each stage responds."
-            : "Select any stage to inspect the evidence behind it."}
-        </span>
-
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-x-5 gap-y-2 text-[13px] text-slate-400">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <span className="inline-flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-[#54d786] shadow-[0_0_10px_rgba(84,215,134,0.2)]" />
